@@ -50,6 +50,17 @@ public:
         ResourceReader reader;
     };
 
+    /// A family of resources under one URI prefix, e.g. agentic://wiki/{page}.
+    /// The reader receives the full URI that was asked for.
+    struct ResourceTemplate
+    {
+        std::string uriTemplate;
+        std::string name;
+        std::string description;
+        std::string mimeType;
+        std::function<std::string(const std::string& uri)> reader;
+    };
+
     struct PromptArgument
     {
         std::string name;
@@ -72,6 +83,7 @@ public:
 
     void addTool(Tool tool);
     void addResource(Resource resource);
+    void addResourceTemplate(ResourceTemplate resourceTemplate);
     void addPrompt(Prompt prompt);
     bool hasTool(const std::string& name) const;
     const std::map<std::string, Tool>& toolList() const;
@@ -97,6 +109,7 @@ private:
     nlohmann::json callTool(const nlohmann::json& id, const nlohmann::json& params) const;
     nlohmann::json listResources(const nlohmann::json& id) const;
     nlohmann::json readResource(const nlohmann::json& id, const nlohmann::json& params) const;
+    nlohmann::json listResourceTemplates(const nlohmann::json& id) const;
     nlohmann::json listPrompts(const nlohmann::json& id) const;
     nlohmann::json getPrompt(const nlohmann::json& id, const nlohmann::json& params) const;
 
@@ -105,6 +118,7 @@ private:
 
     std::map<std::string, Tool> tools;
     std::map<std::string, Resource> resources;
+    std::vector<ResourceTemplate> templates;
     std::map<std::string, Prompt> prompts;
     std::string instructions;
     ToolStartHook onToolStart;

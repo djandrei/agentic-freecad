@@ -235,3 +235,37 @@ TEST_F(ProtocolTest, imagesBecomeImageContent)
     EXPECT_FALSE(result["structuredContent"].contains("_images"));
     EXPECT_EQ(result["structuredContent"]["width"], 2);
 }
+
+TEST_F(ProtocolTest, resourceTemplatesAreListedAndRead)
+{
+    Agentic::Protocol protocol;
+    protocol.addResourceTemplate({
+        "test://page/{name}",
+        "Pages",
+        "a page per name",
+        "text/markdown",
+        [](const std::string& uri) -> std::string {
+            if (uri == "test://page/missing") {
+                throw std::runtime_error("no such page");
+            }
+            return "# " + uri.substr(std::string("test://page/").size());
+        },
+    });
+    json list = json::parse(
+        protocol.handleLine(R"({"jsonrpc":"2.0","id":21,"method":"resources/templates/list"})")
+    );
+    EXPECT_EQ(list["result"]["resourceTemplates"][0]["uriTemplate"], "test://page/{name}");
+    json read = json::parse(protocol.handleLine(
+        R"({"jsonrpc":"2.0","id":22,"method":"resources/read","params":{"uri":"test://page/Part_Box"}})"
+    ));
+    EXPECT_EQ(read["result"]["contents"][0]["text"], "# Part_Box");
+    EXPECT_EQ(read["result"]["contents"][0]["mimeType"], "text/markdown");
+    json missing = json::parse(protocol.handleLine(
+        R"({"jsonrpc":"2.0","id":23,"method":"resources/read","params":{"uri":"test://page/missing"}})"
+    ));
+    EXPECT_EQ(missing["error"]["code"], -32002);
+    json bare = json::parse(protocol.handleLine(
+        R"({"jsonrpc":"2.0","id":24,"method":"resources/read","params":{"uri":"test://page/"}})"
+    ));
+    EXPECT_EQ(bare["error"]["code"], -32002);
+}

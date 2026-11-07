@@ -19,6 +19,8 @@ set(Agentic_SRCS
     AppAgentic.cpp
     ChangeLog.cpp
     ChangeLog.h
+    DocTools.cpp
+    DocTools.h
     DocumentEngine.cpp
     DocumentEngine.h
     DocumentTools.cpp

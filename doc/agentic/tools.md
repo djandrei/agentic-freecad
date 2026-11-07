@@ -2,7 +2,7 @@
 
 Generated from the server's registry by `src/Mod/Agentic/tools_reference.py`; do not edit by hand.
 
-68 tools, 1 resources, 1 prompts.
+74 tools, 5 resources, 2 prompts.
 
 ## Tools
 
@@ -135,6 +135,56 @@ Run a GUI command as its toolbar button would, against the current selection and
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | Command name, e.g. Part_Box. |
+
+### `docs_api`
+
+The Python API of a class, module function or member: Part.Shape, Part.Shape.makeFillet, FreeCAD.Vector, FreeCAD.newDocument, Sketcher.Constraint. Classes come with every member's signature (all overloads) and documentation.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Dotted name, a bare class name, or the C++ class name. |
+
+### `docs_command`
+
+A GUI command's documentation: menu text, tooltip, status tip, what's this, shortcut, and its wiki page when cached (docs_page fetches it).
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Command name, e.g. PartDesign_Pad. |
+
+### `docs_page`
+
+A FreeCAD wiki page as Markdown (from the FreeCAD-documentation repository, the source the Help module reads), fetched over HTTPS once and cached. Page names use underscores: Part_Box, PartDesign_Pad, Sketcher_Workbench, Expressions.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `page` | string | yes | Wiki page name. |
+| `refresh` | boolean | no | Fetch again even if cached. Default false. |
+
+### `docs_search`
+
+Search FreeCAD's documentation: the Python API (generated from the binding stubs of this build), the GUI commands, cached wiki pages and the READMEs of installed addons. Every word of the query must occur. Returns ranked hits with snippets; read a hit with docs_api, docs_command or docs_page.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `limit` | integer | no | Maximum hits. Default 20. |
+| `query` | string | yes | Words to look for, e.g. "fillet edges" or "Placement rotation". |
+| `sources` | array of string ("api", "command", "wiki", "addon") | no | Where to search. Default all. |
+
+### `docs_status`
+
+What documentation is available: API classes and functions, cached wiki pages and the cache folder, GUI commands.
+
+No arguments.
+
+### `docs_update`
+
+Fetch wiki pages into the cache: the listed `pages`, or with `archive: true` every English page from the documentation repository's archive (a large download).
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `archive` | boolean | no | Download the whole wiki archive. Default false. |
+| `pages` | array of string | no | Wiki page names to fetch. |
 
 ### `document_close`
 
@@ -682,10 +732,18 @@ No arguments.
 
 | URI | Name | Type | Description |
 |---|---|---|---|
+| `agentic://project/changes` | Change log | application/json | The current project's change log as JSON: every mutation with its Python. |
+| `agentic://project/log` | Message log | application/json | The last 500 console messages FreeCAD printed, as JSON. |
 | `agentic://status` | Server status | application/json | How this server was started and which tool groups are available. |
+| `agentic://docs/api/{name}` | API reference entry | application/json | A class, function or member of FreeCAD's Python API as JSON (see docs_api). |
+| `agentic://wiki/{page}` | Wiki page | text/markdown | A FreeCAD wiki page as Markdown (fetched and cached on first read). |
 
 ## Prompts
 
 ### `agentic-loop`
 
 How to work with FreeCAD through this server: the write, run, inspect, capture, export loop.
+
+### `freecad-object-model`
+
+How FreeCAD models things: documents, objects, properties, view providers, recompute, expressions, shapes and sub-elements, PartDesign bodies, sketches, undo.

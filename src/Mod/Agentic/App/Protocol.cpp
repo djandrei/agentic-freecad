@@ -39,6 +39,11 @@ void Protocol::addResource(Resource resource)
     resources[uri] = std::move(resource);
 }
 
+void Protocol::addResourceTemplate(ResourceTemplate resourceTemplate)
+{
+    templates.push_back(std::move(resourceTemplate));
+}
+
 void Protocol::addPrompt(Prompt prompt)
 {
     const std::string name = prompt.name;
@@ -127,7 +132,7 @@ json Protocol::handleRequest(const json& request)
         return readResource(id, params);
     }
     if (method == "resources/templates/list") {
-        return result(id, {{"resourceTemplates", json::array()}});
+        return listResourceTemplates(id);
     }
     if (method == "prompts/list") {
         return listPrompts(id);
@@ -250,19 +255,50 @@ json Protocol::readResource(const json& id, const json& params) const
         return error(id, invalidParams, "resources/read needs a uri");
     }
     const std::string uri = params["uri"].get<std::string>();
-    auto it = resources.find(uri);
-    if (it == resources.end()) {
-        return error(id, resourceNotFound, "Resource not found: " + uri);
-    }
     std::string text;
+    std::string mimeType;
     try {
-        text = it->second.reader();
+        auto it = resources.find(uri);
+        if (it != resources.end()) {
+            text = it->second.reader();
+            mimeType = it->second.mimeType;
+        }
+        else {
+            const ResourceTemplate* match = nullptr;
+            for (const auto& candidate : templates) {
+                const std::string prefix
+                    = candidate.uriTemplate.substr(0, candidate.uriTemplate.find('{'));
+                if (uri.size() > prefix.size() && uri.compare(0, prefix.size(), prefix) == 0) {
+                    match = &candidate;
+                    break;
+                }
+            }
+            if (!match) {
+                return error(id, resourceNotFound, "Resource not found: " + uri);
+            }
+            text = match->reader(uri);
+            mimeType = match->mimeType;
+        }
     }
     catch (const std::exception& e) {
         return error(id, resourceNotFound, uri + ": " + e.what());
     }
-    json contents = json::array({{{"uri", uri}, {"mimeType", it->second.mimeType}, {"text", text}}});
+    json contents = json::array({{{"uri", uri}, {"mimeType", mimeType}, {"text", text}}});
     return result(id, {{"contents", contents}});
+}
+
+json Protocol::listResourceTemplates(const json& id) const
+{
+    json list = json::array();
+    for (const auto& t : templates) {
+        list.push_back({
+            {"uriTemplate", t.uriTemplate},
+            {"name", t.name},
+            {"description", t.description},
+            {"mimeType", t.mimeType},
+        });
+    }
+    return result(id, {{"resourceTemplates", list}});
 }
 
 json Protocol::listPrompts(const json& id) const

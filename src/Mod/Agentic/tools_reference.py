@@ -61,6 +61,7 @@ def _render_tool(tool):
 def render():
     tools = _rpc("tools/list")["tools"]
     resources = _rpc("resources/list")["resources"]
+    templates = _rpc("resources/templates/list")["resourceTemplates"]
     prompts = _rpc("prompts/list")["prompts"]
 
     groups = {}
@@ -74,7 +75,7 @@ def render():
         "Generated from the server's registry by `src/Mod/Agentic/tools_reference.py`; "
         "do not edit by hand.",
         "",
-        f"{len(tools)} tools, {len(resources)} resources, {len(prompts)} prompts.",
+        f"{len(tools)} tools, {len(resources) + len(templates)} resources, {len(prompts)} prompts.",
         "",
         "## Tools",
         "",
@@ -84,11 +85,16 @@ def render():
             lines += _render_tool(tool)
 
     lines += ["## Resources", ""]
-    if resources:
+    if resources or templates:
         lines += ["| URI | Name | Type | Description |", "|---|---|---|---|"]
         for res in resources:
             lines.append(
                 f"| `{res['uri']}` | {res['name']} | {res.get('mimeType', '')} | "
+                f"{res.get('description', '').strip()} |"
+            )
+        for res in templates:
+            lines.append(
+                f"| `{res['uriTemplate']}` | {res['name']} | {res.get('mimeType', '')} | "
                 f"{res.get('description', '').strip()} |"
             )
     else:

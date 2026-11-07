@@ -832,3 +832,101 @@ class AddonToolsTest(unittest.TestCase):
         regs = call("addon_registry_list")["registries"]
         self.assertEqual([(r["location"], r["scope"]) for r in regs], [(self.registry, "user")])
         self.assertIn("Demo", [a["id"] for a in call("addon_catalog")["addons"]])
+
+
+class DocToolsTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        previous = os.environ.get("AGENTIC_FREECAD_DOCS_CACHE")
+        os.environ["AGENTIC_FREECAD_DOCS_CACHE"] = os.path.join(self.tmp.name, "wiki")
+        self.addCleanup(self.restore_env, previous)
+        os.makedirs(os.environ["AGENTIC_FREECAD_DOCS_CACHE"])
+        with open(
+            os.path.join(os.environ["AGENTIC_FREECAD_DOCS_CACHE"], "Agentic_Test_Page.md"), "w"
+        ) as handle:
+            handle.write(
+                "# Agentic test page\nA zorblax is how a [Part Box](Part_Box) gets its corners.\n"
+            )
+
+    @staticmethod
+    def restore_env(previous):
+        if previous is None:
+            os.environ.pop("AGENTIC_FREECAD_DOCS_CACHE", None)
+        else:
+            os.environ["AGENTIC_FREECAD_DOCS_CACHE"] = previous
+
+    def test_api_lookup(self):
+        shape = call("docs_api", name="Part.Shape")
+        self.assertEqual(shape["kind"], "class")
+        names = [m["name"] for m in shape["members"]]
+        self.assertIn("makeFillet", names)
+        fillet = call("docs_api", name="Part.Shape.makeFillet")
+        self.assertEqual(fillet["owner"], "Part.Shape")
+        self.assertGreaterEqual(len(fillet["signatures"]), 2)
+        self.assertEqual(call("docs_api", name="TopoShape")["name"], "Part.Shape")
+        self.assertEqual(call("docs_api", name="FreeCAD.newDocument")["kind"], "function")
+        self.assertEqual(call("docs_api", name="FreeCAD.Vector")["name"], "FreeCAD.Base.Vector")
+        self.assertEqual(call("docs_api", name="App.Vector.cross")["owner"], "FreeCAD.Base.Vector")
+        with self.assertRaises(RuntimeError) as err:
+            call("docs_api", name="Part.NoSuchThing")
+        self.assertIn("candidates", str(err.exception))
+
+    def test_search_api_and_wiki(self):
+        hits = call("docs_search", query="fillet", sources=["api"])["results"]
+        self.assertTrue(any(h["id"] == "Part.Shape.makeFillet" for h in hits))
+        wiki = call("docs_search", query="zorblax corners")
+        self.assertEqual(wiki["results"][0]["id"], "Agentic_Test_Page")
+        self.assertIn("zorblax", wiki["results"][0]["snippet"])
+        self.assertEqual(call("docs_search", query="zorblax nothingelse")["results"], [])
+        self.assertIn(
+            "GUI commands are not searched", " ".join(call("docs_search", query="box")["notes"])
+        )
+        with self.assertRaises(RuntimeError):
+            call("docs_search", query="!")
+
+    def test_cached_page_status_and_resources(self):
+        page = call("docs_page", page="Agentic_Test_Page")
+        self.assertFalse(page["fetched"])
+        self.assertIn("zorblax", page["content"])
+        self.assertEqual(page["links"], ["Part_Box"])
+        with self.assertRaises(RuntimeError):
+            call("docs_page", page="../../etc/passwd")
+        status = call("docs_status")
+        self.assertEqual(status["wiki"]["pages"], 1)
+        self.assertGreater(status["api"]["classes"], 200)
+        self.assertIsNone(status["commands"])
+
+        templates = rpc("resources/templates/list")["result"]["resourceTemplates"]
+        self.assertEqual(
+            sorted(t["uriTemplate"] for t in templates),
+            ["agentic://docs/api/{name}", "agentic://wiki/{page}"],
+        )
+        read = rpc("resources/read", {"uri": "agentic://wiki/Agentic_Test_Page"})["result"][
+            "contents"
+        ][0]
+        self.assertEqual(read["mimeType"], "text/markdown")
+        self.assertIn("zorblax", read["text"])
+        api = json.loads(
+            rpc("resources/read", {"uri": "agentic://docs/api/FreeCAD.Vector"})["result"][
+                "contents"
+            ][0]["text"]
+        )
+        self.assertEqual(api["kind"], "class")
+        prompt = rpc("prompts/get", {"name": "freecad-object-model"})["result"]
+        self.assertIn("recompute", prompt["messages"][0]["content"]["text"])
+
+    def test_project_resources(self):
+        root = os.path.realpath(os.path.join(self.tmp.name, "p"))
+        call("project_open", path=root, create=True)
+        call("file_write", path="a.txt", content="x")
+        changes = json.loads(
+            rpc("resources/read", {"uri": "agentic://project/changes"})["result"]["contents"][0][
+                "text"
+            ]
+        )
+        self.assertEqual(changes[-1]["summary"].split(" ")[0], "created")
+        log = json.loads(
+            rpc("resources/read", {"uri": "agentic://project/log"})["result"]["contents"][0]["text"]
+        )
+        self.assertIsInstance(log, list)

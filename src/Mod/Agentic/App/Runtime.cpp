@@ -6,6 +6,7 @@
 #include <Base/Interpreter.h>
 
 #include "AddonTools.h"
+#include "DocTools.h"
 #include "DocumentTools.h"
 #include "EngineSession.h"
 #include "HttpServer.h"
@@ -52,6 +53,7 @@ Runtime::Runtime()
     registerShapeTools(*proto, *this);
     registerSketchTools(*proto, *this);
     registerAddonTools(*proto, *this);
+    registerDocTools(*proto, *this);
 
     proto->setToolHooks(
         [this](const std::string& name, const nlohmann::json&) {

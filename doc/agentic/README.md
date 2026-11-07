@@ -5,7 +5,31 @@ Context Protocol (MCP) server drives FreeCAD, and a viewer window shows a
 person what the agent is doing. The design is in `DESIGN.md` at the root of
 the parent workspace; this folder documents what is built.
 
-## Status: stage 7
+## Status: stage 8
+
+Stage 8 added documentation:
+
+- the Python API index is generated at build time from the `.pyi` binding
+  stubs (`make_api_index.py`, stdlib only, a custom command of the
+  module's CMake) into `Mod/Agentic/api_index.json`: every class with its
+  members, signatures (all overloads), documentation and deprecations,
+  and every module-level function; classes carry their Python name, and
+  Base types their `FreeCAD.` alias;
+- `docs_api` looks up a class, a member or a function (`Part.Shape`,
+  `Part.Shape.makeFillet`, `App.Vector`, the C++ class name);
+  `docs_command` documents a GUI command; `docs_page` fetches a wiki page
+  as Markdown from FreeCAD-documentation (the source the Help module
+  reads) and caches it under `AGENTIC_FREECAD_DOCS_CACHE` or
+  `$XDG_CACHE_HOME/agentic-freecad/wiki`; `docs_update` prefetches pages
+  or the whole archive; `docs_status`;
+- `docs_search` ranks hits across the API, the commands, the cached wiki
+  pages and installed addons' READMEs;
+- resources: `agentic://docs/api/{name}` and `agentic://wiki/{page}`
+  (resource templates, now supported by the protocol),
+  `agentic://project/changes`, `agentic://project/log`; prompt:
+  `freecad-object-model`.
+
+## Stage 7
 
 Stage 7 added addons:
 

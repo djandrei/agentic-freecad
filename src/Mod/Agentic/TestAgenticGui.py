@@ -471,3 +471,13 @@ class AddonWorkbenchTest(unittest.TestCase):
             call("workbench_activate", name="DemoWorkbench")["workbench"], "DemoWorkbench"
         )
         call("workbench_activate", name="PartWorkbench")
+
+
+class DocCommandTest(unittest.TestCase):
+    def test_command_docs_and_search(self):
+        info = call("docs_command", name="PartDesign_Pad")
+        self.assertEqual(info["wikiPage"], "PartDesign_Pad")
+        self.assertTrue(info["menuText"])
+        hits = call("docs_search", query="pad", sources=["command"])["results"]
+        self.assertIn("PartDesign_Pad", [h["id"] for h in hits])
+        self.assertIsNotNone(call("docs_status")["commands"])
