@@ -34,7 +34,7 @@ Runtime& Runtime::instance()
 Runtime::Runtime()
     : cfg(AgentConfig::fromApplication())
     , messageLog(std::make_unique<MessageLog>())
-    , sessionManager(std::make_unique<SessionManager>(observerList, *messageLog))
+    , sessionManager(std::make_unique<SessionManager>(observerList, *messageLog, *this))
     , proto(std::make_unique<Protocol>())
 {
     Base::Console().attachObserver(messageLog.get());
@@ -49,11 +49,13 @@ Runtime::Runtime()
 
     proto->setToolHooks(
         [this](const std::string& name, const nlohmann::json&) {
+            runningTool = name;
             for (EngineSession* session : sessionManager->list()) {
                 session->setCurrentTool(name);
             }
         },
         [this](const std::string& name, const nlohmann::json& args, double ms, bool ok) {
+            runningTool.clear();
             observerList.each([&](SessionObserver& o) { o.toolCalled(name, args, ms, ok); });
         }
     );
@@ -194,6 +196,23 @@ bool Runtime::guiAvailable() const
 void Runtime::setActivityListener(ActivityListener newListener)
 {
     listener = std::move(newListener);
+}
+
+const std::string& Runtime::currentTool() const
+{
+    return runningTool;
+}
+
+void Runtime::noteDialog(nlohmann::json dialog)
+{
+    dialogs.push_back(std::move(dialog));
+}
+
+nlohmann::json Runtime::takeDialogs()
+{
+    nlohmann::json out = dialogs;
+    dialogs = nlohmann::json::array();
+    return out;
 }
 
 }  // namespace Agentic

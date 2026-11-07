@@ -10,9 +10,10 @@ namespace fs = std::filesystem;
 namespace Agentic
 {
 
-SessionManager::SessionManager(ObserverList& observers, MessageLog& messages)
+SessionManager::SessionManager(ObserverList& observers, MessageLog& messages, Runtime& runtime)
     : observerList(observers)
     , messageLog(messages)
+    , runtime(runtime)
 {}
 
 SessionManager::~SessionManager() = default;
@@ -38,7 +39,7 @@ EngineSession& SessionManager::open(const fs::path& root, bool create)
         }
     }
 
-    auto session = std::make_unique<EngineSession>(folder, observerList, messageLog);
+    auto session = std::make_unique<EngineSession>(folder, observerList, messageLog, runtime);
     EngineSession* raw = session.get();
     sessions.push_back(std::move(session));
     observerList.each([raw](SessionObserver& o) { o.projectOpened(raw->project()); });

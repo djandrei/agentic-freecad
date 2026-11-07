@@ -11,6 +11,7 @@ namespace Agentic
 {
 
 class MessageLog;
+class Runtime;
 
 /// The session of one open project: its folder, its files and its change log.
 ///
@@ -20,7 +21,12 @@ class MessageLog;
 class AgenticExport EngineSession: public ProjectSession
 {
 public:
-    EngineSession(const std::filesystem::path& root, const ObserverList& observers, MessageLog& messages);
+    EngineSession(
+        const std::filesystem::path& root,
+        const ObserverList& observers,
+        MessageLog& messages,
+        Runtime& runtime
+    );
     ~EngineSession() override;
 
     const Project& project() const override;

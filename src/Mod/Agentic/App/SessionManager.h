@@ -16,6 +16,7 @@ namespace Agentic
 
 class EngineSession;
 class MessageLog;
+class Runtime;
 
 /// One session per open project, and the current one.
 ///
@@ -24,7 +25,7 @@ class MessageLog;
 class AgenticExport SessionManager
 {
 public:
-    SessionManager(ObserverList& observers, MessageLog& messages);
+    SessionManager(ObserverList& observers, MessageLog& messages, Runtime& runtime);
     ~SessionManager();
 
     /// Opens the project in the folder (creating the settings file when
@@ -43,6 +44,7 @@ public:
 private:
     ObserverList& observerList;
     MessageLog& messageLog;
+    Runtime& runtime;
     std::vector<std::unique_ptr<EngineSession>> sessions;
     EngineSession* active {nullptr};
 };

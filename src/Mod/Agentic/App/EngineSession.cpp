@@ -14,13 +14,14 @@ namespace Agentic
 EngineSession::EngineSession(
     const std::filesystem::path& root,
     const ObserverList& observerList,
-    MessageLog& messages
+    MessageLog& messages,
+    Runtime& runtime
 )
     : proj(root)
     , store(root)
     , observers(observerList)
     , docs(std::make_unique<DocumentEngine>(*this, messages))
-    , scriptEngine(std::make_unique<ScriptEngine>(*this, messages))
+    , scriptEngine(std::make_unique<ScriptEngine>(*this, messages, runtime))
 {
     proj.load();
     if (!Project::exists(root)) {

@@ -340,6 +340,24 @@ json DocumentEngine::saveOwned(App::Document* doc)
     return out;
 }
 
+json DocumentEngine::saveProjectDocuments()
+{
+    json saved = json::array();
+    if (!session.project().settings().autoSave) {
+        return saved;
+    }
+    const std::string root = session.project().root().string();
+    for (App::Document* open : App::GetApplication().getDocuments()) {
+        const std::string file = open->FileName.getStrValue();
+        const bool inProject = file.empty() || file.rfind(root, 0) == 0;
+        if (!inProject || open->testStatus(App::Document::TempDoc)) {
+            continue;
+        }
+        saved.push_back(saveOwned(open));
+    }
+    return saved;
+}
+
 json DocumentEngine::saveDocument(const std::string& document, const std::optional<std::string>& as)
 {
     const Call call = begin();

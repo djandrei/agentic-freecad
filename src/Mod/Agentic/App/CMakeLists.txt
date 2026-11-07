@@ -29,6 +29,7 @@ set(Agentic_SRCS
     HttpServer.h
     MessageLog.cpp
     MessageLog.h
+    ObjectTracker.h
     PreCompiled.h
     PreferenceTools.cpp
     PreferenceTools.h

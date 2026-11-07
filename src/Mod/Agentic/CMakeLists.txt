@@ -12,7 +12,7 @@ set(Agentic_Scripts
 
 if(BUILD_GUI)
     add_subdirectory(Gui)
-    list(APPEND Agentic_Scripts InitGui.py TestAgenticGui.py)
+    list(APPEND Agentic_Scripts InitGui.py TestAgenticGui.py agentic_gui.py)
 endif(BUILD_GUI)
 
 add_custom_target(AgenticScripts ALL

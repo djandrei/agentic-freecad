@@ -5,7 +5,33 @@ Context Protocol (MCP) server drives FreeCAD, and a viewer window shows a
 person what the agent is doing. The design is in `DESIGN.md` at the root of
 the parent workspace; this folder documents what is built.
 
-## Status: stage 4
+## Status: stage 5
+
+Stage 5 added GUI commands, task panels, modal dialogs and selection
+(registered only when the GUI layer is loaded, so `FreeCADCmd` lacks them):
+
+- `workbench_list`, `workbench_activate`, `command_list` (all commands, or a
+  workbench's toolbar commands with their toolbar names, filterable),
+  `command_info`;
+- `command_run` runs a command as its toolbar button would: the macro
+  recorder captures the Python it issues, the object tracker records what
+  it created, changed or deleted, and a task panel it opened is described;
+  an inactive command is refused with the reason;
+- task panels: `task_get` lists the open panel's visible input fields (id,
+  kind, label, value, options, tooltip), `task_set` fills them through the
+  widgets' own API so the panel reacts as to a person (combo boxes also
+  emit `activated`), `task_accept` and `task_reject` press OK or Cancel;
+- modal dialogs: while a tool runs (and always in agent mode) a modal
+  dialog is answered on the next event-loop turn, a message box with its
+  default button, else its escape button, else the button that declines;
+  file dialogs and other dialogs are rejected; the answers are returned
+  with the tool result under `dialogs`, so no command can block the server;
+- `selection_get`, `selection_set` (objects and sub-elements, replace or
+  add), `selection_clear`.
+
+Command activity is tested the way the classic GUI does it, after the
+command's action exists: calling `isActive()` earlier crashes some upstream
+commands (`Std_Expressions` dereferences its action there).
 
 Stage 4 added Python execution:
 
@@ -140,7 +166,7 @@ QT_QPA_PLATFORM=offscreen build/relWithDebInfo/bin/FreeCAD -t TestAgenticGui
 python3 tests/agentic/stdio_smoke.py build/relWithDebInfo/bin/FreeCAD
 python3 tests/agentic/stdio_smoke.py build/relWithDebInfo/bin/FreeCADCmd
 python3 tests/agentic/http_smoke.py build/relWithDebInfo/bin/FreeCAD
-build/relWithDebInfo/bin/FreeCADCmd -c "import tools_reference; tools_reference.main('doc/agentic/tools.md')"
+QT_QPA_PLATFORM=offscreen build/relWithDebInfo/bin/FreeCAD tests/agentic/make_tools_reference.py   # regenerates tools.md
 ```
 
 See `upstream-merge.md` for the list of upstream files the fork edits.

@@ -81,8 +81,13 @@ public:
     nlohmann::json objectSummary(const App::DocumentObject* obj) const;
 
     /// Saves a document to its file (or the default file in the project) and
-    /// makes it one of the project's documents. Used after python_run.
+    /// makes it one of the project's documents.
     nlohmann::json saveOwned(App::Document* doc);
+
+    /// With autoSave: saves every open document that belongs to the project
+    /// (its file is inside the project folder, or it has no file yet, in
+    /// which case it is adopted). Returns the list of saves.
+    nlohmann::json saveProjectDocuments();
 
 private:
     struct Call

@@ -2,7 +2,7 @@
 
 Generated from the server's registry by `src/Mod/Agentic/tools_reference.py`; do not edit by hand.
 
-31 tools, 1 resources, 1 prompts.
+43 tools, 1 resources, 1 prompts.
 
 ## Tools
 
@@ -15,6 +15,31 @@ The change log of a project: every mutating operation in order, with the equival
 | `limit` | integer | no | Maximum number of entries. Default 200. |
 | `project` | string | no | Name or folder of an open project to address; defaults to the current project. |
 | `since` | integer | no | First sequence number to return. Default 1. |
+
+### `command_info`
+
+Details of one GUI command: menu text, tooltip, status tip, what's this, shortcut, active.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Command name, e.g. Part_Box or PartDesign_Pad. |
+
+### `command_list`
+
+GUI commands with menu text, tooltip, shortcut and whether each is active for the current document and selection. With `workbench` the workbench is activated and only its toolbar commands are listed, each with its toolbar names.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `filter` | string | no | Case-insensitive substring of the name, menu text or tooltip. |
+| `workbench` | string | no | Limit to the toolbars of this workbench (activates it). |
+
+### `command_run`
+
+Run a GUI command as its toolbar button would, against the current selection and active document. Returns the Python the command recorded, the objects it created, changed or deleted, the task panel it opened (drive it with task_get, task_set, task_accept, task_reject), modal dialogs that were auto-answered, and the console messages. Fails when the command is not active.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Command name, e.g. Part_Box. |
 
 ### `document_close`
 
@@ -294,15 +319,76 @@ Run Python inside FreeCAD: a code string or a project file. The namespace persis
 | `project` | string | no | Name or folder of an open project; defaults to the current project. |
 | `timeoutSeconds` | number | no | Abort Python execution after this many seconds. Default 60; 0 disables. |
 
+### `selection_clear`
+
+Clear the selection.
+
+No arguments.
+
+### `selection_get`
+
+The current selection: objects with their selected sub-elements (Face1, Edge3, ...).
+
+No arguments.
+
+### `selection_set`
+
+Select objects and sub-elements (replacing the selection unless `add`). This is how the agent picks faces and edges for commands; find element names with object_get or shape_elements.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `add` | boolean | no | Keep the existing selection. Default false. |
+| `items` | array of object | yes | What to select. |
+
 ### `status`
 
 Report how this server was started: transport, headless flag, project folder and whether the GUI layer (views, captures) is available.
 
 No arguments.
 
+### `task_accept`
+
+Press OK on the open task panel; the feature is created or updated and saved according to the project settings.
+
+No arguments.
+
+### `task_get`
+
+The open task panel: its boxes, buttons and input fields (id, kind, label, value, options). Null when no panel is open.
+
+No arguments.
+
+### `task_reject`
+
+Press Cancel on the open task panel.
+
+No arguments.
+
+### `task_set`
+
+Fill fields of the open task panel by id (from task_get). Quantities take a number in the field's unit or a string with unit; choices take an option text or index; booleans true/false; buttons any value to click them; lists an array of item texts.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `fields` | object | yes | Field id to value. |
+
 ### `version`
 
 Report the FreeCAD version and the agentic-freecad server version.
+
+No arguments.
+
+### `workbench_activate`
+
+Activate a workbench (loads its module and commands). Returns its toolbars and menus.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Workbench name, e.g. PartWorkbench, PartDesignWorkbench, SketcherWorkbench. |
+
+### `workbench_list`
+
+The installed workbenches with their menu text, and which one is active.
 
 No arguments.
 

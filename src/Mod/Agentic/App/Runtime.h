@@ -6,6 +6,8 @@
 #include <memory>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 #include <Mod/Agentic/AgenticGlobal.h>
 
 #include "AgentConfig.h"
@@ -59,6 +61,13 @@ public:
 
     void setActivityListener(ActivityListener listener);
 
+    /// The tool whose call is running on the main thread, or empty.
+    const std::string& currentTool() const;
+
+    /// Modal dialogs auto-answered while a tool ran (filled by the GUI part).
+    void noteDialog(nlohmann::json dialog);
+    nlohmann::json takeDialogs();
+
 private:
     Runtime();
     ~Runtime();
@@ -75,6 +84,8 @@ private:
     std::unique_ptr<StderrLogger> logger;
     ActivityListener listener;
     bool gui {false};
+    std::string runningTool;
+    nlohmann::json dialogs = nlohmann::json::array();
 };
 
 }  // namespace Agentic

@@ -9,6 +9,9 @@
 
 #include <Mod/Agentic/App/Runtime.h>
 
+#include "CommandEngine.h"
+#include "DialogGuard.h"
+#include "GuiTools.h"
 #include "ViewerShell.h"
 
 namespace AgenticGui
@@ -20,7 +23,23 @@ public:
     Module()
         : Py::ExtensionModule<Module>("AgenticGui")
     {
+        add_varargs_method(
+            "isCommandActive",
+            &Module::isCommandActive,
+            "isCommandActive(name) -> bool: whether a GUI command can run now. Creates the "
+            "command's action first, as the classic GUI does before testing a command."
+        );
         initialize("The GUI part of the Agentic module: the agent viewer.");
+    }
+
+private:
+    Py::Object isCommandActive(const Py::Tuple& args)
+    {
+        const char* name = nullptr;
+        if (!PyArg_ParseTuple(args.ptr(), "s", &name)) {
+            throw Py::Exception();
+        }
+        return Py::Boolean(Agentic::CommandEngine::isActive(name));
     }
 };
 
@@ -35,6 +54,8 @@ void installAgentMode()
 {
     Agentic::Runtime& runtime = Agentic::Runtime::instance();
     runtime.setGuiAvailable(true);
+    Agentic::registerGuiTools(runtime.protocol(), runtime);
+    Agentic::DialogGuard::install();
     if (!runtime.config().enabled) {
         return;
     }

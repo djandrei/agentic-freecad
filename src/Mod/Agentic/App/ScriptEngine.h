@@ -25,7 +25,7 @@ class Runtime;
 class AgenticExport ScriptEngine
 {
 public:
-    ScriptEngine(EngineSession& session, MessageLog& messages);
+    ScriptEngine(EngineSession& session, MessageLog& messages, Runtime& runtime);
 
     nlohmann::json run(
         const std::optional<std::string>& code,
@@ -39,6 +39,7 @@ public:
 private:
     EngineSession& session;
     MessageLog& messages;
+    Runtime& runtime;
 };
 
 AgenticExport void registerScriptTools(Protocol& protocol, Runtime& runtime);

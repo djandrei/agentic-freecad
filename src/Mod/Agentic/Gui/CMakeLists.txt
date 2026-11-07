@@ -5,9 +5,22 @@ set(AgenticGui_LIBS
     FreeCADGui
 )
 
+include_directories(
+    SYSTEM
+    ${nlohmann_json_INCLUDE_DIRS}
+)
+
 set(AgenticGui_SRCS
     AppAgenticGui.cpp
+    CommandEngine.cpp
+    CommandEngine.h
+    DialogGuard.cpp
+    DialogGuard.h
+    GuiTools.cpp
+    GuiTools.h
     PreCompiled.h
+    TaskPanelEngine.cpp
+    TaskPanelEngine.h
     ViewerShell.cpp
     ViewerShell.h
 )

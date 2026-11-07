@@ -3,17 +3,14 @@
 #include "PreCompiled.h"
 
 #include <algorithm>
-#include <set>
-
-#include <fastsignals/connection.h>
 
 #include <App/Application.h>
 #include <App/Document.h>
-#include <App/DocumentObject.h>
 
 #include "DocumentEngine.h"
 #include "EngineSession.h"
 #include "MessageLog.h"
+#include "ObjectTracker.h"
 #include "Protocol.h"
 #include "PyBridge.h"
 #include "Runtime.h"
@@ -25,64 +22,10 @@ using json = nlohmann::json;
 namespace Agentic
 {
 
-namespace
-{
-
-struct ObjectTracker
-{
-    std::set<std::pair<std::string, std::string>> created;
-    std::set<std::pair<std::string, std::string>> changed;
-    std::set<std::pair<std::string, std::string>> deleted;
-    fastsignals::scoped_connection newConn;
-    fastsignals::scoped_connection changeConn;
-    fastsignals::scoped_connection deleteConn;
-
-    ObjectTracker()
-    {
-        App::Application& app = App::GetApplication();
-        newConn = app.signalNewObject.connect([this](const App::DocumentObject& obj) {
-            created.insert(key(obj));
-        });
-        changeConn = app.signalChangedObject.connect(
-            [this](const App::DocumentObject& obj, const App::Property&) {
-                // An object signals a last change while it is being removed.
-                const auto k = key(obj);
-                if (!created.contains(k) && !deleted.contains(k)) {
-                    changed.insert(k);
-                }
-            }
-        );
-        deleteConn = app.signalDeletedObject.connect([this](const App::DocumentObject& obj) {
-            const auto k = key(obj);
-            if (created.erase(k) == 0) {
-                changed.erase(k);
-                deleted.insert(k);
-            }
-        });
-    }
-
-    static std::pair<std::string, std::string> key(const App::DocumentObject& obj)
-    {
-        const App::Document* doc = obj.getDocument();
-        const char* name = obj.getNameInDocument();
-        return {doc ? doc->getName() : "", name ? name : ""};
-    }
-
-    static json list(const std::set<std::pair<std::string, std::string>>& items)
-    {
-        json out = json::array();
-        for (const auto& [doc, name] : items) {
-            out.push_back({{"document", doc}, {"object", name}});
-        }
-        return out;
-    }
-};
-
-}  // namespace
-
-ScriptEngine::ScriptEngine(EngineSession& session, MessageLog& messages)
+ScriptEngine::ScriptEngine(EngineSession& session, MessageLog& messages, Runtime& runtime)
     : session(session)
     , messages(messages)
+    , runtime(runtime)
 {}
 
 json ScriptEngine::run(
@@ -118,6 +61,7 @@ json ScriptEngine::run(
         doc = docs.resolveDocument("");
     }
 
+    runtime.takeDialogs();
     const std::uint64_t messagesFrom = messages.nextSeq();
     json args = {
         {"code", source},
@@ -157,29 +101,11 @@ json ScriptEngine::run(
                 transaction["rolledBack"] = true;
             }
         }
-        result["objects"] = {
-            {"created", ObjectTracker::list(tracker.created)},
-            {"changed", ObjectTracker::list(tracker.changed)},
-            {"deleted", ObjectTracker::list(tracker.deleted)},
-        };
+        result["objects"] = tracker.toJson();
     }
     result["transaction"] = transaction;
-
-    // Save the project's documents, and adopt documents the script created
-    // (those without a file yet, or with a file inside the project folder).
-    json saved = json::array();
-    if (session.project().settings().autoSave) {
-        const std::string root = session.project().root().string();
-        for (App::Document* open : App::GetApplication().getDocuments()) {
-            const std::string file = open->FileName.getStrValue();
-            const bool inProject = file.empty() || file.rfind(root, 0) == 0;
-            if (!inProject || open->testStatus(App::Document::TempDoc)) {
-                continue;
-            }
-            saved.push_back(docs.saveOwned(open));
-        }
-    }
-    result["saved"] = saved;
+    result["dialogs"] = runtime.takeDialogs();
+    result["saved"] = docs.saveProjectDocuments();
 
     json list = json::array();
     int errors = 0;

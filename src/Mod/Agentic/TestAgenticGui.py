@@ -129,3 +129,142 @@ class ViewPropertyTest(unittest.TestCase):
         self.assertIn(".ViewObject.Visibility = False", python)
         with self.assertRaises(RuntimeError):
             call("object_set", object="B", view={"DisplayMode": "Nope"})
+
+
+class CommandToolsTest(unittest.TestCase):
+    def setUp(self):
+        # Cleanup is registered first so it runs even if the rest of setUp fails;
+        # a document left open would make FreeCAD ask to save it on exit.
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.cleanup)
+        self.root = os.path.realpath(self.tmp.name)
+        call("project_open", path=self.root)
+        call("document_new", name="AgenticCommandTest")
+        call("workbench_activate", name="PartWorkbench")
+
+    def cleanup(self):
+        if call("task_get")["taskPanel"] is not None:
+            call("task_reject")
+        call("selection_clear")
+        for info in call("document_list")["documents"]:
+            call("document_close", document=info["name"])
+        self.tmp.cleanup()
+
+    def test_workbenches_and_commands(self):
+        listed = call("workbench_list")
+        self.assertIn("PartWorkbench", [w["name"] for w in listed["workbenches"]])
+        self.assertEqual(listed["active"], "PartWorkbench")
+        again = call("workbench_activate", name="PartWorkbench")  # already active
+        self.assertEqual(again["workbench"], "PartWorkbench")
+        commands = call("command_list", workbench="PartWorkbench")["commands"]
+        names = [c["name"] for c in commands]
+        self.assertIn("Part_Box", names)
+        self.assertIn("Part_Cut", names)
+        box = [c for c in commands if c["name"] == "Part_Box"][0]
+        self.assertTrue(box["toolbars"])
+        self.assertTrue(box["active"])
+        # Listing every command tests each one; Std_Expressions used to crash here.
+        everything = call("command_list")["commands"]
+        self.assertIn("Std_Expressions", [c["name"] for c in everything])
+        found = call("command_list", filter="fillet")["commands"]
+        self.assertIn("Part_Fillet", [c["name"] for c in found])
+        self.assertEqual(call("command_info", name="Part_Box")["menuText"], "Cube")
+        with self.assertRaises(RuntimeError):
+            call("command_info", name="No_Such_Command")
+        with self.assertRaises(RuntimeError):
+            call("workbench_activate", name="NoSuchWorkbench")
+
+    def test_command_run_records_python_and_objects(self):
+        run = call("command_run", name="Part_Box")
+        self.assertIn('App.ActiveDocument.addObject("Part::Box","Box")', run["python"])
+        self.assertEqual([o["object"] for o in run["objects"]["created"]], ["Box"])
+        self.assertIsNone(run["taskPanel"])
+        self.assertTrue(run["saved"][0]["saved"])
+        change = call("changes_get")["changes"][-1]
+        self.assertEqual(change["kind"], "command")
+        self.assertIn("addObject", change["python"])
+
+    def test_inactive_command_is_refused(self):
+        with self.assertRaises(RuntimeError) as err:
+            call("command_run", name="Part_Cut")  # needs two selected shapes
+        self.assertIn("not active", str(err.exception))
+
+    def test_selection_by_sub_element(self):
+        call("object_create", type="Part::Box", name="B")
+        selected = call("selection_set", items=[{"object": "B", "sub": ["Face6", "Edge1"]}])
+        self.assertEqual(selected["selection"][0]["object"], "B")
+        self.assertEqual(sorted(selected["selection"][0]["subElements"]), ["Edge1", "Face6"])
+        call("object_create", type="Part::Cylinder", name="C")
+        both = call("selection_set", items=[{"object": "C"}], add=True)
+        self.assertEqual([s["object"] for s in both["selection"]], ["B", "C"])
+        self.assertEqual(call("selection_get")["selection"], both["selection"])
+        # Part_Cut counts selection entries: two sub-elements of B and C are three.
+        self.assertFalse(call("command_info", name="Part_Cut")["active"])
+        call("selection_set", items=[{"object": "B"}, {"object": "C"}])
+        self.assertTrue(call("command_info", name="Part_Cut")["active"])
+        cut = call("command_run", name="Part_Cut")
+        self.assertIn("Cut", [o["object"] for o in cut["objects"]["created"]])
+        self.assertEqual(call("selection_clear")["selection"], [])
+        with self.assertRaises(RuntimeError):
+            call("selection_set", items=[{"object": "Missing"}])
+
+    def test_task_panel_is_driven(self):
+        run = call("command_run", name="Part_Primitives")
+        panel = run["taskPanel"]
+        self.assertIsNotNone(panel)
+        self.assertIn("Ok", panel["buttons"])
+        fields = {f["id"]: f for f in panel["fields"]}
+        self.assertIn("PrimitiveTypeCB", fields)
+        self.assertIn("Box", fields["PrimitiveTypeCB"]["options"])
+        self.assertNotIn("helixPitch", fields)  # on an inactive page
+        self.assertFalse([f for f in panel["fields"] if "ActionLabel" in f["id"]])
+
+        changed = call("task_set", fields={"PrimitiveTypeCB": "Box"})
+        self.assertEqual(changed["changed"], ["PrimitiveTypeCB"])
+        fields = {f["id"]: f for f in changed["fields"]}
+        self.assertEqual(fields["PrimitiveTypeCB"]["value"], "Box")
+        self.assertIn("boxLength", fields)
+        changed = call(
+            "task_set",
+            fields={"boxLength": "25 mm", "boxWidth": 4, "boxHeight": {"value": 3, "unit": "mm"}},
+        )
+        fields = {f["id"]: f for f in changed["fields"]}
+        self.assertAlmostEqual(fields["boxLength"]["value"]["value"], 25.0)
+        self.assertAlmostEqual(fields["boxWidth"]["value"]["value"], 4.0)
+        with self.assertRaises(RuntimeError):
+            call("task_set", fields={"noSuchField": 1})
+        with self.assertRaises(RuntimeError):
+            call("task_set", fields={"PrimitiveTypeCB": "Teapot"})
+
+        # Part_Primitives creates on Create (the panel's button), then closes on Close.
+        create = [f for f in changed["fields"] if f["kind"] == "button" and "Create" in f["label"]]
+        if create:
+            call("task_set", fields={create[0]["id"]: True})
+        else:
+            call("task_accept")
+        if call("task_get")["taskPanel"] is not None:
+            call("task_reject")
+        boxes = [o for o in call("object_list", type="Part::Box")["objects"]]
+        self.assertTrue(boxes)
+        length = call("object_get", object=boxes[-1]["name"], properties=["Length"])["properties"][
+            "Length"
+        ]
+        self.assertAlmostEqual(length["value"]["value"], 25.0)
+        with self.assertRaises(RuntimeError):
+            call("task_accept")
+
+    def test_modal_dialogs_are_answered(self):
+        code = (
+            "from PySide6.QtWidgets import QMessageBox\n"
+            "r1 = QMessageBox.question(None, 'Agentic', 'Proceed?')\n"
+            "box = QMessageBox(QMessageBox.Warning, 'Agentic', 'Overwrite?', "
+            "QMessageBox.Ok | QMessageBox.Cancel)\n"
+            "box.setDefaultButton(QMessageBox.Ok)\n"
+            "r2 = box.exec()\n"
+            "(int(r1) == int(QMessageBox.No), r2 == int(QMessageBox.Ok))"
+        )
+        run = call("python_run", code=code)
+        self.assertTrue(run["ok"], run.get("exception"))
+        self.assertEqual(run["value"], [True, True])
+        self.assertEqual([d["text"] for d in run["dialogs"]], ["Proceed?", "Overwrite?"])
+        self.assertEqual([d["answer"] for d in run["dialogs"]], ["No", "OK"])

@@ -68,6 +68,10 @@ jobs:
         run: pixi run python3 tests/agentic/http_smoke.py ${{ env.builddir }}/bin/FreeCAD
 
       - name: Tool reference is up to date
+        env:
+          QT_QPA_PLATFORM: offscreen
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          AGENTIC_TOOLS_MD: /tmp/tools.md
         run: |
-          pixi run ${{ env.builddir }}/bin/FreeCADCmd -c "import tools_reference; tools_reference.main('/tmp/tools.md')"
+          pixi run ${{ env.builddir }}/bin/FreeCAD tests/agentic/make_tools_reference.py
           diff -u doc/agentic/tools.md /tmp/tools.md
