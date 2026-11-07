@@ -5,6 +5,7 @@ add_subdirectory(App)
 set(Agentic_Scripts
     Init.py
     TestAgenticApp.py
+    tools_reference.py
 )
 
 if(BUILD_GUI)

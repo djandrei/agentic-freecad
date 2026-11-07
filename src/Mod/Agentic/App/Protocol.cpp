@@ -5,6 +5,7 @@
 #include <App/Application.h>
 
 #include "Protocol.h"
+#include "Schema.h"
 
 using json = nlohmann::json;
 
@@ -18,11 +19,7 @@ constexpr int parseError = -32700;
 constexpr int invalidRequest = -32600;
 constexpr int methodNotFound = -32601;
 constexpr int invalidParams = -32602;
-
-const char* instructions
-    = "FreeCAD in agent mode. Call `version` and `status` to see what this server "
-      "offers; the full tool set (documents, objects, Python, views, export) arrives "
-      "in later stages of the agentic-freecad fork.";
+constexpr int resourceNotFound = -32002;
 
 }  // namespace
 
@@ -34,9 +31,31 @@ void Protocol::addTool(Tool tool)
     tools[name] = std::move(tool);
 }
 
+void Protocol::addResource(Resource resource)
+{
+    const std::string uri = resource.uri;
+    resources[uri] = std::move(resource);
+}
+
+void Protocol::addPrompt(Prompt prompt)
+{
+    const std::string name = prompt.name;
+    prompts[name] = std::move(prompt);
+}
+
 bool Protocol::hasTool(const std::string& name) const
 {
     return tools.contains(name);
+}
+
+const std::map<std::string, Protocol::Tool>& Protocol::toolList() const
+{
+    return tools;
+}
+
+void Protocol::setInstructions(std::string text)
+{
+    instructions = std::move(text);
 }
 
 std::string Protocol::serverVersion()
@@ -93,6 +112,21 @@ json Protocol::handleRequest(const json& request)
     if (method == "tools/call") {
         return callTool(id, params);
     }
+    if (method == "resources/list") {
+        return listResources(id);
+    }
+    if (method == "resources/read") {
+        return readResource(id, params);
+    }
+    if (method == "resources/templates/list") {
+        return result(id, {{"resourceTemplates", json::array()}});
+    }
+    if (method == "prompts/list") {
+        return listPrompts(id);
+    }
+    if (method == "prompts/get") {
+        return getPrompt(id, params);
+    }
     return error(id, methodNotFound, "Method not found: " + method);
 }
 
@@ -100,10 +134,13 @@ json Protocol::initialize(const json& id) const
 {
     json value = {
         {"protocolVersion", protocolVersion},
-        {"capabilities", {{"tools", json::object()}}},
+        {"capabilities",
+         {{"tools", json::object()}, {"resources", json::object()}, {"prompts", json::object()}}},
         {"serverInfo", {{"name", serverName}, {"version", serverVersion()}}},
-        {"instructions", instructions},
     };
+    if (!instructions.empty()) {
+        value["instructions"] = instructions;
+    }
     return result(id, value);
 }
 
@@ -132,6 +169,10 @@ json Protocol::callTool(const json& id, const json& params) const
     }
 
     const json arguments = params.contains("arguments") ? params["arguments"] : json::object();
+    if (auto problem = validateJson(it->second.inputSchema, arguments)) {
+        return error(id, invalidParams, name + ": " + *problem);
+    }
+
     json value;
     try {
         value = it->second.handler(arguments);
@@ -150,6 +191,85 @@ json Protocol::callTool(const json& id, const json& params) const
         {"isError", false},
     };
     return result(id, success);
+}
+
+json Protocol::listResources(const json& id) const
+{
+    json list = json::array();
+    for (const auto& [uri, resource] : resources) {
+        list.push_back({
+            {"uri", uri},
+            {"name", resource.name},
+            {"description", resource.description},
+            {"mimeType", resource.mimeType},
+        });
+    }
+    return result(id, {{"resources", list}});
+}
+
+json Protocol::readResource(const json& id, const json& params) const
+{
+    if (!params.is_object() || !params.contains("uri") || !params["uri"].is_string()) {
+        return error(id, invalidParams, "resources/read needs a uri");
+    }
+    const std::string uri = params["uri"].get<std::string>();
+    auto it = resources.find(uri);
+    if (it == resources.end()) {
+        return error(id, resourceNotFound, "Resource not found: " + uri);
+    }
+    std::string text;
+    try {
+        text = it->second.reader();
+    }
+    catch (const std::exception& e) {
+        return error(id, resourceNotFound, uri + ": " + e.what());
+    }
+    json contents = json::array({{{"uri", uri}, {"mimeType", it->second.mimeType}, {"text", text}}});
+    return result(id, {{"contents", contents}});
+}
+
+json Protocol::listPrompts(const json& id) const
+{
+    json list = json::array();
+    for (const auto& [name, prompt] : prompts) {
+        json arguments = json::array();
+        for (const auto& arg : prompt.arguments) {
+            arguments.push_back(
+                {{"name", arg.name}, {"description", arg.description}, {"required", arg.required}}
+            );
+        }
+        list.push_back({{"name", name}, {"description", prompt.description}, {"arguments", arguments}});
+    }
+    return result(id, {{"prompts", list}});
+}
+
+json Protocol::getPrompt(const json& id, const json& params) const
+{
+    if (!params.is_object() || !params.contains("name") || !params["name"].is_string()) {
+        return error(id, invalidParams, "prompts/get needs a prompt name");
+    }
+    const std::string name = params["name"].get<std::string>();
+    auto it = prompts.find(name);
+    if (it == prompts.end()) {
+        return error(id, invalidParams, "Unknown prompt: " + name);
+    }
+    const json arguments = params.contains("arguments") ? params["arguments"] : json::object();
+    for (const auto& arg : it->second.arguments) {
+        if (arg.required && !arguments.contains(arg.name)) {
+            return error(id, invalidParams, name + ": missing required argument '" + arg.name + "'");
+        }
+    }
+    std::string text;
+    try {
+        text = it->second.render(arguments);
+    }
+    catch (const std::exception& e) {
+        return error(id, invalidParams, name + ": " + e.what());
+    }
+    json messages = json::array({
+        {{"role", "user"}, {"content", {{"type", "text"}, {"text", text}}}},
+    });
+    return result(id, {{"description", it->second.description}, {"messages", messages}});
 }
 
 json Protocol::result(const json& id, json value)

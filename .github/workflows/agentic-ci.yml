@@ -54,7 +54,20 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: pixi run ${{ env.builddir }}/bin/FreeCAD -t TestAgenticGui
 
-      - name: stdio end-to-end
+      - name: stdio end-to-end (FreeCAD)
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: pixi run python3 tests/agentic/stdio_smoke.py ${{ env.builddir }}/bin/FreeCAD
+
+      - name: stdio end-to-end (FreeCADCmd)
+        run: pixi run python3 tests/agentic/stdio_smoke.py ${{ env.builddir }}/bin/FreeCADCmd
+
+      - name: HTTP end-to-end
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: pixi run python3 tests/agentic/http_smoke.py ${{ env.builddir }}/bin/FreeCAD
+
+      - name: Tool reference is up to date
+        run: |
+          pixi run ${{ env.builddir }}/bin/FreeCADCmd -c "import tools_reference; tools_reference.main('/tmp/tools.md')"
+          diff -u doc/agentic/tools.md /tmp/tools.md

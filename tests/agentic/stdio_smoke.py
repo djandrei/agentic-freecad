@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """End-to-end smoke test of the stdio transport.
 
-Spawns `FreeCAD --agent-stdio`, performs the MCP handshake, lists the tools
-and calls `version` and `status`. Needs no FreeCAD Python bindings: it is a
-plain client talking JSON-RPC over the process's pipes.
+Spawns `FreeCAD --agent-stdio` (or `FreeCADCmd --agent-stdio`), performs the
+MCP handshake, lists the tools and calls `version` and `status`. Needs no
+FreeCAD Python bindings: it is a plain client talking JSON-RPC over the
+process's pipes.
 
     python3 tests/agentic/stdio_smoke.py build/relWithDebInfo/bin/FreeCAD
+    python3 tests/agentic/stdio_smoke.py build/relWithDebInfo/bin/FreeCADCmd
 """
 
 import json
@@ -66,7 +68,18 @@ def main(binary):
         assert status["agentMode"] is True, status
         assert status["transport"] == "stdio", status
         assert status["headless"] is True, status
-        assert status["gui"] is True, status
+        expect_gui = not os.path.basename(binary).startswith("FreeCADCmd")
+        assert status["gui"] is expect_gui, status
+
+        send({"jsonrpc": "2.0", "id": 5, "method": "resources/read",
+              "params": {"uri": "agentic://status"}})
+        contents = receive()["result"]["contents"][0]
+        assert json.loads(contents["text"])["transport"] == "stdio", contents
+
+        send({"jsonrpc": "2.0", "id": 6, "method": "prompts/get",
+              "params": {"name": "agentic-loop"}})
+        prompt = receive()["result"]
+        assert prompt["messages"][0]["content"]["text"], prompt
 
         print(f"ok: FreeCAD {version['version']} answered over stdio; status={status}")
     finally:

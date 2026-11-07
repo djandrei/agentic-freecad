@@ -55,7 +55,7 @@ class AgenticProtocolTest(unittest.TestCase):
         self.assertEqual(status["transport"], "none")
 
     def test_unknown_method(self):
-        response = rpc("prompts/list")
+        response = rpc("completion/complete")
         self.assertEqual(response["error"]["code"], -32601)
 
     def test_notification_has_no_response(self):
@@ -66,3 +66,32 @@ class AgenticProtocolTest(unittest.TestCase):
         response = json.loads(Agentic.handleRequest("{"))
         self.assertEqual(response["error"]["code"], -32700)
         self.assertIsNone(response["id"])
+
+    def test_invalid_arguments_rejected(self):
+        response = rpc("tools/call", {"name": "version", "arguments": {"extra": 1}})
+        self.assertEqual(response["error"]["code"], -32602)
+        self.assertIn("unknown property 'extra'", response["error"]["message"])
+
+    def test_resources(self):
+        listed = rpc("resources/list")["result"]["resources"]
+        self.assertIn("agentic://status", [r["uri"] for r in listed])
+        read = rpc("resources/read", {"uri": "agentic://status"})["result"]["contents"][0]
+        self.assertEqual(read["mimeType"], "application/json")
+        self.assertFalse(json.loads(read["text"])["agentMode"])
+        missing = rpc("resources/read", {"uri": "agentic://missing"})
+        self.assertEqual(missing["error"]["code"], -32002)
+
+    def test_prompts(self):
+        listed = rpc("prompts/list")["result"]["prompts"]
+        self.assertIn("agentic-loop", [p["name"] for p in listed])
+        got = rpc("prompts/get", {"name": "agentic-loop"})["result"]
+        self.assertEqual(got["messages"][0]["role"], "user")
+        self.assertIn("FreeCAD", got["messages"][0]["content"]["text"])
+
+    def test_tool_reference_renders(self):
+        import tools_reference
+
+        text = tools_reference.render()
+        self.assertIn("### `version`", text)
+        self.assertIn("agentic://status", text)
+        self.assertIn("### `agentic-loop`", text)

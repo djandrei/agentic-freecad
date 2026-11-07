@@ -15,6 +15,7 @@ namespace Agentic
 
 class Protocol;
 class StdioServer;
+class HttpServer;
 class StderrLogger;
 
 /// The one agent-mode runtime of the process.
@@ -34,9 +35,18 @@ public:
     Protocol& protocol();
 
     /// Starts the configured transport. Returns true when a transport is now
-    /// running; false when agent mode is off or the transport is unavailable.
+    /// running; false when agent mode is off or the transport failed.
     bool start();
     bool isRunning() const;
+
+    /// For a process without a GUI event loop (FreeCADCmd): starts the
+    /// transport and runs a QCoreApplication loop until the transport ends.
+    /// Returns the process exit code.
+    int serve();
+
+    /// The HTTP endpoint and token while the HTTP transport runs, else empty.
+    std::string httpUrl() const;
+    std::string httpToken() const;
 
     void setGuiAvailable(bool available);
     bool guiAvailable() const;
@@ -47,9 +57,12 @@ private:
     Runtime();
     ~Runtime();
 
+    void forwardActivity(const std::string& line);
+
     AgentConfig cfg;
     std::unique_ptr<Protocol> proto;
     std::unique_ptr<StdioServer> stdio;
+    std::unique_ptr<HttpServer> http;
     std::unique_ptr<StderrLogger> logger;
     ActivityListener listener;
     bool gui {false};

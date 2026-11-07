@@ -7,6 +7,7 @@ include_directories(
 
 add_executable(Agentic_tests_run
     Protocol.cpp
+    Schema.cpp
 )
 
 target_include_directories(

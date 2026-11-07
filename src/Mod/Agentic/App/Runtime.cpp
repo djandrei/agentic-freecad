@@ -3,7 +3,9 @@
 #include "PreCompiled.h"
 
 #include <Base/Console.h>
+#include <Base/Interpreter.h>
 
+#include "HttpServer.h"
 #include "Protocol.h"
 #include "Runtime.h"
 #include "StderrLogger.h"
@@ -27,6 +29,8 @@ Runtime::Runtime()
     , proto(std::make_unique<Protocol>())
 {
     registerCoreTools(*proto, *this);
+    registerCoreResources(*proto, *this);
+    registerCorePrompts(*proto);
 }
 
 Runtime::~Runtime() = default;
@@ -39,6 +43,13 @@ const AgentConfig& Runtime::config() const
 Protocol& Runtime::protocol()
 {
     return *proto;
+}
+
+void Runtime::forwardActivity(const std::string& line)
+{
+    if (listener) {
+        listener(line);
+    }
 }
 
 bool Runtime::start()
@@ -55,25 +66,69 @@ bool Runtime::start()
         Base::Console().attachObserver(logger.get());
 
         stdio = std::make_unique<StdioServer>(*proto);
-        stdio->setActivityListener([this](const std::string& line) {
-            if (listener) {
-                listener(line);
-            }
-        });
+        stdio->setActivityListener([this](const std::string& line) { forwardActivity(line); });
         stdio->start();
         Base::Console().log("Agentic: MCP server listening on stdin/stdout\n");
         return true;
     }
 
-    Base::Console().warning(
-        "Agentic: the HTTP transport is not implemented yet; start with --agent-stdio\n"
+    auto server = std::make_unique<HttpServer>(*proto);
+    if (!server->listen(static_cast<quint16>(cfg.port))) {
+        Base::Console().error("Agentic: cannot listen on 127.0.0.1:{}\n", cfg.port);
+        return false;
+    }
+    server->setActivityListener([this](const std::string& line) { forwardActivity(line); });
+    http = std::move(server);
+
+    // The client needs these lines; they go to stderr whatever the console
+    // settings are, in a form that can be pasted.
+    const std::string url = http->url().toStdString();
+    const std::string token = http->token().toStdString();
+    std::fprintf(stderr, "Agentic: MCP server at %s\n", url.c_str());
+    std::fprintf(stderr, "Agentic: token %s\n", token.c_str());
+    std::fprintf(
+        stderr,
+        "Agentic: claude mcp add --transport http freecad %s --header \"Authorization: Bearer "
+        "%s\"\n",
+        url.c_str(),
+        token.c_str()
     );
-    return false;
+    std::fflush(stderr);
+    Base::Console().log("Agentic: MCP server at {}\n", url);
+    return true;
 }
 
 bool Runtime::isRunning() const
 {
-    return stdio != nullptr;
+    return stdio != nullptr || http != nullptr;
+}
+
+int Runtime::serve()
+{
+    std::unique_ptr<QCoreApplication> app;
+    if (!QCoreApplication::instance()) {
+        static int argc = 1;
+        static char name[] = "FreeCAD";
+        static char* argv[] = {name, nullptr};
+        app = std::make_unique<QCoreApplication>(argc, argv);
+    }
+    if (!start()) {
+        return 1;
+    }
+    // Called from Python (the AgenticServe script): release the GIL while the
+    // loop runs; tools that touch Python take it back.
+    Base::PyGILStateRelease release;
+    return QCoreApplication::exec();
+}
+
+std::string Runtime::httpUrl() const
+{
+    return http ? http->url().toStdString() : std::string();
+}
+
+std::string Runtime::httpToken() const
+{
+    return http ? http->token().toStdString() : std::string();
 }
 
 void Runtime::setGuiAvailable(bool available)

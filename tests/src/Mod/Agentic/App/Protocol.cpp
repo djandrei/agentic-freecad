@@ -81,7 +81,7 @@ TEST_F(ProtocolTest, unknownToolIsInvalidParams)
 
 TEST_F(ProtocolTest, unknownMethodIsMethodNotFound)
 {
-    json response = call(R"({"jsonrpc":"2.0","id":6,"method":"resources/list"})");
+    json response = call(R"({"jsonrpc":"2.0","id":6,"method":"completion/complete"})");
     EXPECT_EQ(response["error"]["code"], -32601);
 }
 
@@ -114,4 +114,98 @@ TEST_F(ProtocolTest, toolExceptionBecomesToolError)
     ));
     EXPECT_TRUE(response["result"]["isError"].get<bool>());
     EXPECT_EQ(response["result"]["content"][0]["text"], "kaboom");
+}
+
+TEST_F(ProtocolTest, initializeAnnouncesResourcesAndPrompts)
+{
+    json response = call(R"({"jsonrpc":"2.0","id":10,"method":"initialize","params":{}})");
+    EXPECT_TRUE(response["result"]["capabilities"].contains("resources"));
+    EXPECT_TRUE(response["result"]["capabilities"].contains("prompts"));
+    EXPECT_FALSE(response["result"]["instructions"].get<std::string>().empty());
+}
+
+TEST_F(ProtocolTest, statusResourceReadsAsJson)
+{
+    json list = call(R"({"jsonrpc":"2.0","id":11,"method":"resources/list"})");
+    bool found = false;
+    for (const auto& res : list["result"]["resources"]) {
+        found = found || res["uri"] == "agentic://status";
+    }
+    EXPECT_TRUE(found);
+    json read = call(
+        R"({"jsonrpc":"2.0","id":12,"method":"resources/read","params":{"uri":"agentic://status"}})"
+    );
+    const json& contents = read["result"]["contents"][0];
+    EXPECT_EQ(contents["mimeType"], "application/json");
+    json status = json::parse(contents["text"].get<std::string>());
+    EXPECT_FALSE(status["agentMode"].get<bool>());
+}
+
+TEST_F(ProtocolTest, unknownResourceIsNotFound)
+{
+    json read = call(
+        R"({"jsonrpc":"2.0","id":13,"method":"resources/read","params":{"uri":"agentic://nope"}})"
+    );
+    EXPECT_EQ(read["error"]["code"], -32002);
+}
+
+TEST_F(ProtocolTest, loopPromptIsListedAndRendered)
+{
+    json list = call(R"({"jsonrpc":"2.0","id":14,"method":"prompts/list"})");
+    EXPECT_EQ(list["result"]["prompts"][0]["name"], "agentic-loop");
+    json get = call(
+        R"({"jsonrpc":"2.0","id":15,"method":"prompts/get","params":{"name":"agentic-loop"}})"
+    );
+    EXPECT_EQ(get["result"]["messages"][0]["role"], "user");
+    EXPECT_FALSE(get["result"]["messages"][0]["content"]["text"].get<std::string>().empty());
+}
+
+TEST_F(ProtocolTest, invalidArgumentsAreRejectedBeforeTheHandler)
+{
+    Agentic::Protocol protocol;
+    bool called = false;
+    protocol.addTool({
+        "sized",
+        "needs a size",
+        json(
+            {{"type", "object"},
+             {"properties", {{"size", {{"type", "integer"}}}}},
+             {"required", {"size"}},
+             {"additionalProperties", false}}
+        ),
+        [&called](const json&) -> json {
+            called = true;
+            return json::object();
+        },
+    });
+    json response = json::parse(protocol.handleLine(
+        R"({"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"sized","arguments":{"size":"big"}}})"
+    ));
+    EXPECT_EQ(response["error"]["code"], -32602);
+    EXPECT_NE(response["error"]["message"].get<std::string>().find("arguments.size"), std::string::npos);
+    EXPECT_FALSE(called);
+    response = json::parse(protocol.handleLine(
+        R"({"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"sized","arguments":{"size":3}}})"
+    ));
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(response["result"]["isError"].get<bool>());
+}
+
+TEST_F(ProtocolTest, promptMissingRequiredArgumentIsInvalidParams)
+{
+    Agentic::Protocol protocol;
+    protocol.addPrompt({
+        "greet",
+        "greets",
+        {{"who", "the name", true}},
+        [](const json& args) { return "hello " + args["who"].get<std::string>(); },
+    });
+    json response = json::parse(protocol.handleLine(
+        R"({"jsonrpc":"2.0","id":18,"method":"prompts/get","params":{"name":"greet"}})"
+    ));
+    EXPECT_EQ(response["error"]["code"], -32602);
+    response = json::parse(protocol.handleLine(
+        R"({"jsonrpc":"2.0","id":19,"method":"prompts/get","params":{"name":"greet","arguments":{"who":"box"}}})"
+    ));
+    EXPECT_EQ(response["result"]["messages"][0]["content"]["text"], "hello box");
 }

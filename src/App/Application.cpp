@@ -2699,6 +2699,13 @@ void processProgramOptions(const boost::program_options::variables_map& vm, std:
         // A headless launch does not use StartHidden: that mode skips guiInitialized
         // and quits after processing files. The Agentic module's Init.py selects the
         // offscreen Qt platform instead, so no window ever appears.
+        if (mConfig["RunMode"] != "Gui") {
+            // FreeCADCmd (or FreeCAD -c) has no event loop of its own: run the server
+            // from an internal script that loops until the transport ends.
+            mConfig["RunMode"] = "Internal";
+            mConfig["ScriptFileName"] = "AgenticServe";
+            new Base::ScriptProducer("AgenticServe", "import Agentic\nimport sys\nsys.exit(Agentic.serve())\n");
+        }
     }
     if (vm.contains("project")) {
         mConfig["AgentProject"] = vm["project"].as<std::string>();

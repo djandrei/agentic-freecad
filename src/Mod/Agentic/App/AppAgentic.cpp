@@ -36,6 +36,12 @@ public:
             "handleRequest(line: str) -> str: answer one JSON-RPC request as the MCP "
             "server would; returns '' for a notification"
         );
+        add_varargs_method(
+            "serve",
+            &Module::serve,
+            "serve() -> int: run the configured MCP transport in a QCoreApplication loop "
+            "until it ends (used by FreeCADCmd --agent-stdio); returns the exit code"
+        );
         initialize("The Agentic module: an MCP server that lets an agent drive FreeCAD.");
     }
 
@@ -69,7 +75,16 @@ private:
         dict.setItem("port", Py::Long(cfg.port));
         dict.setItem("project", Py::String(cfg.project));
         dict.setItem("gui", Py::Boolean(Runtime::instance().guiAvailable()));
+        dict.setItem("url", Py::String(Runtime::instance().httpUrl()));
         return dict;
+    }
+
+    Py::Object serve(const Py::Tuple& args)
+    {
+        if (!PyArg_ParseTuple(args.ptr(), "")) {
+            throw Py::Exception();
+        }
+        return Py::Long(Runtime::instance().serve());
     }
 
     Py::Object handleRequest(const Py::Tuple& args)

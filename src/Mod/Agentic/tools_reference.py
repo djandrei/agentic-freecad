@@ -1,0 +1,117 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+"""Generate the tool reference (doc/agentic/tools.md) from the live registry.
+
+Run inside FreeCAD so the registry is the one the binary ships:
+
+    FreeCADCmd -c "import tools_reference; tools_reference.main('doc/agentic/tools.md')"
+
+The GUI tool groups are only registered when FreeCADGui is loaded; run the
+same line with `FreeCAD` under Xvfb or the offscreen platform to include them.
+"""
+
+import json
+import sys
+
+import Agentic
+
+
+def _rpc(method, params=None):
+    request = {"jsonrpc": "2.0", "id": 1, "method": method}
+    if params is not None:
+        request["params"] = params
+    response = json.loads(Agentic.handleRequest(json.dumps(request)))
+    if "error" in response:
+        raise RuntimeError(f"{method}: {response['error']}")
+    return response["result"]
+
+
+def _schema_type(schema):
+    kind = schema.get("type", "any")
+    if isinstance(kind, list):
+        kind = " | ".join(kind)
+    if "enum" in schema:
+        kind += " (" + ", ".join(json.dumps(v) for v in schema["enum"]) + ")"
+    if kind == "array" and "items" in schema:
+        kind = f"array of {_schema_type(schema['items'])}"
+    return kind
+
+
+def _render_tool(tool):
+    lines = [f"### `{tool['name']}`", "", tool["description"].strip(), ""]
+    schema = tool.get("inputSchema", {})
+    properties = schema.get("properties", {})
+    required = set(schema.get("required", []))
+    if properties:
+        lines += ["| Argument | Type | Required | Description |", "|---|---|---|---|"]
+        for name, prop in properties.items():
+            description = prop.get("description", "").replace("\n", " ").strip()
+            if "default" in prop:
+                description += f" Default: `{json.dumps(prop['default'])}`."
+            lines.append(
+                f"| `{name}` | {_schema_type(prop)} | "
+                f"{'yes' if name in required else 'no'} | {description} |"
+            )
+    else:
+        lines.append("No arguments.")
+    lines.append("")
+    return lines
+
+
+def render():
+    tools = _rpc("tools/list")["tools"]
+    resources = _rpc("resources/list")["resources"]
+    prompts = _rpc("prompts/list")["prompts"]
+
+    groups = {}
+    for tool in tools:
+        prefix = tool["name"].split("_", 1)[0]
+        groups.setdefault(prefix, []).append(tool)
+
+    lines = [
+        "# Tool reference",
+        "",
+        "Generated from the server's registry by `src/Mod/Agentic/tools_reference.py`; "
+        "do not edit by hand.",
+        "",
+        f"{len(tools)} tools, {len(resources)} resources, {len(prompts)} prompts.",
+        "",
+        "## Tools",
+        "",
+    ]
+    for prefix in sorted(groups):
+        for tool in sorted(groups[prefix], key=lambda t: t["name"]):
+            lines += _render_tool(tool)
+
+    lines += ["## Resources", ""]
+    if resources:
+        lines += ["| URI | Name | Type | Description |", "|---|---|---|---|"]
+        for res in resources:
+            lines.append(
+                f"| `{res['uri']}` | {res['name']} | {res.get('mimeType', '')} | "
+                f"{res.get('description', '').strip()} |"
+            )
+    else:
+        lines.append("None.")
+    lines += ["", "## Prompts", ""]
+    if prompts:
+        for prompt in prompts:
+            lines += [f"### `{prompt['name']}`", "", prompt["description"].strip(), ""]
+            if prompt.get("arguments"):
+                lines += ["| Argument | Required | Description |", "|---|---|---|"]
+                for arg in prompt["arguments"]:
+                    lines.append(
+                        f"| `{arg['name']}` | {'yes' if arg.get('required') else 'no'} | "
+                        f"{arg.get('description', '')} |"
+                    )
+                lines.append("")
+    else:
+        lines.append("None.")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def main(path):
+    text = render()
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(text)
+    print(f"wrote {path}", file=sys.stderr)
+    return 0

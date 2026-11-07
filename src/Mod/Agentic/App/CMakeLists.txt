@@ -3,21 +3,27 @@
 include_directories(
     SYSTEM
     ${nlohmann_json_INCLUDE_DIRS}
+    ${QtNetwork_INCLUDE_DIRS}
 )
 
 set(Agentic_LIBS
     FreeCADApp
+    ${QtNetwork_LIBRARIES}
 )
 
 set(Agentic_SRCS
     AgentConfig.cpp
     AgentConfig.h
     AppAgentic.cpp
+    HttpServer.cpp
+    HttpServer.h
     PreCompiled.h
     Protocol.cpp
     Protocol.h
     Runtime.cpp
     Runtime.h
+    Schema.cpp
+    Schema.h
     StderrLogger.cpp
     StderrLogger.h
     StdioServer.cpp
