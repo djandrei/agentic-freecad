@@ -13,6 +13,7 @@
 #include "DialogGuard.h"
 #include "GuiTools.h"
 #include "ViewTools.h"
+#include "ViewerBridge.h"
 #include "ViewerShell.h"
 
 namespace AgenticGui
@@ -25,6 +26,11 @@ public:
         : Py::ExtensionModule<Module>("AgenticGui")
     {
         add_varargs_method(
+            "viewerState",
+            &Module::viewerState,
+            "viewerState() -> str: the agent viewer's panels as JSON, or 'null' outside agent mode"
+        );
+        add_varargs_method(
             "isCommandActive",
             &Module::isCommandActive,
             "isCommandActive(name) -> bool: whether a GUI command can run now. Creates the "
@@ -34,6 +40,15 @@ public:
     }
 
 private:
+    Py::Object viewerState(const Py::Tuple& args)
+    {
+        if (!PyArg_ParseTuple(args.ptr(), "")) {
+            throw Py::Exception();
+        }
+        Agentic::ViewerBridge* bridge = Agentic::ViewerBridge::instance();
+        return Py::String(bridge ? bridge->viewerState().dump() : std::string("null"));
+    }
+
     Py::Object isCommandActive(const Py::Tuple& args)
     {
         const char* name = nullptr;
@@ -64,7 +79,6 @@ void installAgentMode()
 
     Gui::MainWindow* mw = Gui::getMainWindow();
     auto shell = new Agentic::ViewerShell(mw);
-    runtime.setActivityListener([shell](const std::string& line) { shell->appendActivity(line); });
 
     // This runs during InitGui.py, before the event loop. A zero-timer fires as
     // soon as the loop starts, after the workbench, toolbars and window settings

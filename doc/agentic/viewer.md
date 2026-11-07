@@ -18,6 +18,22 @@ A plain `FreeCAD` launch is the classic GUI, untouched.
   back whatever a person had orbited to. A person can look around freely;
   it changes nothing the agent sees.
 
+## Panels
+
+The panels are fed by `ViewerBridge`, a `SessionObserver`: the viewer
+watches the session and never drives it.
+
+- **Activity**: every tool call with the time, the tool, a one-line
+  summary of its arguments (file contents and code shown as their
+  length), the duration and whether it succeeded.
+- **Changes**: the project's change log, one row per mutation, the
+  equivalent Python in the tooltip.
+
+Activity and changes are kept per project and switch with the current
+project, the one the last tool call addressed.
+
+`AgenticGui.viewerState()` returns every panel's content as JSON.
+
 ## Checking it
 
 `tests/agentic/viewer_check.py` runs inside an agent-mode FreeCAD, drives

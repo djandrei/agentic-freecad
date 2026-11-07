@@ -94,11 +94,6 @@ QString HttpServer::url() const
     return QStringLiteral("http://127.0.0.1:%1/mcp").arg(server.serverPort());
 }
 
-void HttpServer::setActivityListener(ActivityListener newListener)
-{
-    listener = std::move(newListener);
-}
-
 void HttpServer::onNewConnection()
 {
     while (QTcpSocket* socket = server.nextPendingConnection()) {
@@ -173,16 +168,10 @@ void HttpServer::handle(QTcpSocket* socket, const QByteArray& head, const QByteA
     }
 
     const std::string line = body.toStdString();
-    if (listener) {
-        listener("> " + line);
-    }
     const std::string response = protocol.handleLine(line);
     if (response.empty()) {
         respond(socket, 202, "Accepted", QByteArray());
         return;
-    }
-    if (listener) {
-        listener("< " + response);
     }
     respond(socket, 200, "OK", QByteArray::fromStdString(response));
 }

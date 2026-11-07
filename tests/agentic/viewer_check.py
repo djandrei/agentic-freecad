@@ -90,10 +90,51 @@ def stage_v0(root):
     check("the viewer follows the document the agent works on", active is not None and active.startswith("First"), active)
 
 
+def state():
+    import AgenticGui
+
+    settle()
+    return json.loads(AgenticGui.viewerState())
+
+
+def stage_v1(tmp):
+    first = os.path.join(tmp, "project")
+    second = os.path.join(tmp, "other")
+    viewer = state()
+    check("viewerState reports the current project", viewer["project"] == os.path.realpath(first), viewer["project"])
+    tools = [row["tool"] for row in viewer["activity"]]
+    check("activity lists the tool calls", tools[-3:] == ["object_create", "document_new", "object_create"], tools)
+    check("activity summarises arguments", 'type="Part::Cylinder"' in viewer["activity"][-1]["arguments"],
+          viewer["activity"][-1]["arguments"])
+    kinds = [row["kind"] for row in viewer["changes"]]
+    check("changes list the project's mutations", kinds.count("object") == 2, kinds)
+
+    try:
+        call("object_get", object="NoSuchObject")
+    except RuntimeError:
+        pass
+    check("a failed call shows as an error", state()["activity"][-1]["ok"] is False)
+
+    call("file_write", path="script.py", content="x = 1\n" * 50)
+    check("file contents are summarised by length", "<300 chars>" in state()["activity"][-1]["arguments"],
+          state()["activity"][-1]["arguments"])
+
+    call("project_open", path=second, create=True)
+    viewer = state()
+    check("a new project starts with its own changes", viewer["changes"] == [], viewer["changes"])
+    call("file_write", path="b.txt", content="b")
+    call("project_open", path=first)
+    viewer = state()
+    kinds = [row["kind"] for row in viewer["changes"]]
+    check("switching back restores the first project's changes", kinds.count("object") == 2 and kinds[-1] == "file",
+          kinds)
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="agentic-viewer-")
     try:
         stage_v0(os.path.join(tmp, "project"))
+        stage_v1(tmp)
     except Exception:
         log("FAIL exception\n" + traceback.format_exc())
         failures.append("exception")

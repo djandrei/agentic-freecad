@@ -43,13 +43,10 @@ class AgenticExport StdioServer: public QObject
     Q_OBJECT
 
 public:
-    using ActivityListener = std::function<void(const std::string& line)>;
-
     explicit StdioServer(Protocol& protocol, QObject* parent = nullptr);
     ~StdioServer() override;
 
     void start();
-    void setActivityListener(ActivityListener listener);
 
 private Q_SLOTS:
     void onLine(const QString& line);
@@ -60,7 +57,6 @@ private:
 
     Protocol& protocol;
     StdinReader* reader {nullptr};
-    ActivityListener listener;
 };
 
 }  // namespace Agentic

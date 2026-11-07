@@ -32,8 +32,6 @@ class SessionManager;
 class AgenticExport Runtime
 {
 public:
-    using ActivityListener = std::function<void(const std::string& line)>;
-
     static Runtime& instance();
 
     const AgentConfig& config() const;
@@ -59,7 +57,6 @@ public:
     void setGuiAvailable(bool available);
     bool guiAvailable() const;
 
-    void setActivityListener(ActivityListener listener);
 
     /// The tool whose call is running on the main thread, or empty.
     const std::string& currentTool() const;
@@ -72,8 +69,6 @@ private:
     Runtime();
     ~Runtime();
 
-    void forwardActivity(const std::string& line);
-
     AgentConfig cfg;
     ObserverList observerList;
     std::unique_ptr<MessageLog> messageLog;
@@ -82,7 +77,6 @@ private:
     std::unique_ptr<StdioServer> stdio;
     std::unique_ptr<HttpServer> http;
     std::unique_ptr<StderrLogger> logger;
-    ActivityListener listener;
     bool gui {false};
     std::string runningTool;
     nlohmann::json dialogs = nlohmann::json::array();

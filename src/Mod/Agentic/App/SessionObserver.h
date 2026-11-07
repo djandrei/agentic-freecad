@@ -53,6 +53,8 @@ public:
         const std::string& /*event*/
     )
     {}
+    virtual void toolStarted(const std::string& /*name*/, const nlohmann::json& /*arguments*/)
+    {}
     virtual void toolCalled(
         const std::string& /*name*/,
         const nlohmann::json& /*arguments*/,

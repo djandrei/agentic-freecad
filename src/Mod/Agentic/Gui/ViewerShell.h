@@ -9,8 +9,6 @@
 #include <Mod/Agentic/AgenticGlobal.h>
 #include <Mod/Agentic/App/SessionObserver.h>
 
-class QPlainTextEdit;
-
 namespace Gui
 {
 class MainWindow;
@@ -18,6 +16,8 @@ class MainWindow;
 
 namespace Agentic
 {
+
+class ViewerBridge;
 
 /// Turns the upstream main window into the agent viewer.
 ///
@@ -44,9 +44,6 @@ public:
     /// Brings a document's 3D view to the front.
     void showDocument(const std::string& document);
 
-    /// Appends one line to the Activity panel.
-    void appendActivity(const std::string& line);
-
     // SessionObserver
     void documentChanged(
         const Project& project,
@@ -55,8 +52,10 @@ public:
     ) override;
 
 private:
+    void addPanel(QWidget* widget, const QString& title, const char* objectName, Qt::DockWidgetArea area);
+
     Gui::MainWindow* mainWindow;
-    QPlainTextEdit* activity {nullptr};
+    ViewerBridge* bridge {nullptr};
     bool applied {false};
 };
 

@@ -21,6 +21,8 @@ set(AgenticGui_SRCS
     PreCompiled.h
     TaskPanelEngine.cpp
     TaskPanelEngine.h
+    ViewerBridge.cpp
+    ViewerBridge.h
     ViewerShell.cpp
     ViewerShell.h
     ViewTools.cpp

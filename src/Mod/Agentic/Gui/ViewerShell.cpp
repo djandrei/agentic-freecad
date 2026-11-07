@@ -4,6 +4,7 @@
 
 #include <QMdiArea>
 #include <QMdiSubWindow>
+#include <QTreeWidget>
 
 #include <App/Document.h>
 #include <Base/Console.h>
@@ -14,6 +15,7 @@
 
 #include <Mod/Agentic/App/Runtime.h>
 
+#include "ViewerBridge.h"
 #include "ViewerShell.h"
 
 namespace Agentic
@@ -53,13 +55,9 @@ void ViewerShell::apply()
         mdi->setViewMode(QMdiArea::TabbedView);
     }
 
-    activity = new QPlainTextEdit(mainWindow);
-    activity->setReadOnly(true);
-    activity->setMaximumBlockCount(2000);
-    auto dock = new QDockWidget(QStringLiteral("Activity"), mainWindow);
-    dock->setObjectName(QStringLiteral("Agentic_Activity"));
-    dock->setWidget(activity);
-    mainWindow->addDockWidget(Qt::RightDockWidgetArea, dock);
+    bridge = new ViewerBridge(this);
+    addPanel(bridge->activityPanel(), tr("Activity"), "Agentic_Activity", Qt::BottomDockWidgetArea);
+    addPanel(bridge->changesPanel(), tr("Changes"), "Agentic_Changes", Qt::BottomDockWidgetArea);
 
     const QString transport = cfg.stdio ? QStringLiteral("stdio") : QStringLiteral("http");
     // The window title belongs to the main window, which rewrites it whenever
@@ -119,11 +117,17 @@ void ViewerShell::documentChanged(
     QTimer::singleShot(0, this, [this, document]() { showDocument(document); });
 }
 
-void ViewerShell::appendActivity(const std::string& line)
+void ViewerShell::addPanel(
+    QWidget* widget,
+    const QString& title,
+    const char* objectName,
+    Qt::DockWidgetArea area
+)
 {
-    if (activity) {
-        activity->appendPlainText(QString::fromStdString(line));
-    }
+    auto dock = new QDockWidget(title, mainWindow);
+    dock->setObjectName(QString::fromLatin1(objectName));
+    dock->setWidget(widget);
+    mainWindow->addDockWidget(area, dock);
 }
 
 }  // namespace Agentic

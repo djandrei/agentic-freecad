@@ -56,11 +56,12 @@ Runtime::Runtime()
     registerDocTools(*proto, *this);
 
     proto->setToolHooks(
-        [this](const std::string& name, const nlohmann::json&) {
+        [this](const std::string& name, const nlohmann::json& args) {
             runningTool = name;
             for (EngineSession* session : sessionManager->list()) {
                 session->setCurrentTool(name);
             }
+            observerList.each([&](SessionObserver& o) { o.toolStarted(name, args); });
         },
         [this](const std::string& name, const nlohmann::json& args, double ms, bool ok) {
             runningTool.clear();
@@ -96,13 +97,6 @@ ObserverList& Runtime::observers()
     return observerList;
 }
 
-void Runtime::forwardActivity(const std::string& line)
-{
-    if (listener) {
-        listener(line);
-    }
-}
-
 bool Runtime::start()
 {
     if (!cfg.enabled) {
@@ -126,7 +120,6 @@ bool Runtime::start()
         Base::Console().attachObserver(logger.get());
 
         stdio = std::make_unique<StdioServer>(*proto);
-        stdio->setActivityListener([this](const std::string& line) { forwardActivity(line); });
         stdio->start();
         Base::Console().log("Agentic: MCP server listening on stdin/stdout\n");
         return true;
@@ -137,7 +130,6 @@ bool Runtime::start()
         Base::Console().error("Agentic: cannot listen on 127.0.0.1:{}\n", cfg.port);
         return false;
     }
-    server->setActivityListener([this](const std::string& line) { forwardActivity(line); });
     http = std::move(server);
 
     // The client needs these lines; they go to stderr whatever the console
@@ -199,11 +191,6 @@ void Runtime::setGuiAvailable(bool available)
 bool Runtime::guiAvailable() const
 {
     return gui;
-}
-
-void Runtime::setActivityListener(ActivityListener newListener)
-{
-    listener = std::move(newListener);
 }
 
 const std::string& Runtime::currentTool() const

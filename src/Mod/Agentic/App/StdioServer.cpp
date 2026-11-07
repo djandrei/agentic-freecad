@@ -46,26 +46,15 @@ void StdioServer::start()
     reader->start();
 }
 
-void StdioServer::setActivityListener(ActivityListener newListener)
-{
-    listener = std::move(newListener);
-}
-
 void StdioServer::onLine(const QString& line)
 {
     const std::string request = line.toStdString();
     if (request.empty()) {
         return;
     }
-    if (listener) {
-        listener("> " + request);
-    }
     const std::string response = protocol.handleLine(request);
     if (!response.empty()) {
         writeLine(response);
-        if (listener) {
-            listener("< " + response);
-        }
     }
 }
 

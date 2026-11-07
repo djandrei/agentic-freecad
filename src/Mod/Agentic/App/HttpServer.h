@@ -33,8 +33,6 @@ class AgenticExport HttpServer: public QObject
     Q_OBJECT
 
 public:
-    using ActivityListener = std::function<void(const std::string& line)>;
-
     explicit HttpServer(Protocol& protocol, QObject* parent = nullptr);
 
     bool listen(quint16 port);
@@ -42,7 +40,6 @@ public:
     QString token() const;
     QString url() const;
 
-    void setActivityListener(ActivityListener listener);
 
 private Q_SLOTS:
     void onNewConnection();
@@ -64,7 +61,6 @@ private:
     QTcpServer server;
     QString tokenValue;
     QHash<QTcpSocket*, QByteArray> buffers;
-    ActivityListener listener;
 };
 
 }  // namespace Agentic
