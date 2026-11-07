@@ -18,7 +18,6 @@ json ProjectSettings::toJson() const
     return {
         {"name", name},
         {"mainDocument", mainDocument.empty() ? json() : json(mainDocument)},
-        {"scriptsFolder", scriptsFolder},
         {"addonFolder", addonFolder},
         {"autoSave", autoSave},
         {"autoRecompute", autoRecompute},
@@ -37,9 +36,6 @@ void ProjectSettings::fromJson(const json& value)
     if (value.contains("mainDocument")) {
         mainDocument = value["mainDocument"].is_string() ? value["mainDocument"].get<std::string>()
                                                          : std::string();
-    }
-    if (value.contains("scriptsFolder") && value["scriptsFolder"].is_string()) {
-        scriptsFolder = value["scriptsFolder"].get<std::string>();
     }
     if (value.contains("addonFolder") && value["addonFolder"].is_string()) {
         addonFolder = value["addonFolder"].get<std::string>();

@@ -7,6 +7,7 @@ include_directories(
 
 add_executable(Agentic_tests_run
     FileStore.cpp
+    Fuzz.cpp
     Project.cpp
     Protocol.cpp
     Schema.cpp

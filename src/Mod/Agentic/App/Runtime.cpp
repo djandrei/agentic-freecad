@@ -116,7 +116,7 @@ bool Runtime::start()
 
     if (!cfg.project.empty()) {
         try {
-            loadProjectAddons(sessionManager->open(cfg.project, true));
+            prepareOpenedProject(sessionManager->open(cfg.project, true));
         }
         catch (const std::exception& e) {
             Base::Console().error("Agentic: cannot open project {}: {}\n", cfg.project, e.what());

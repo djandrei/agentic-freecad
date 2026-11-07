@@ -204,6 +204,11 @@ class CommandToolsTest(unittest.TestCase):
         self.assertTrue(call("command_info", name="Part_Cut")["active"])
         cut = call("command_run", name="Part_Cut")
         self.assertIn("Cut", [o["object"] for o in cut["objects"]["created"]])
+        # A boolean's shape has an element map: selection_get still reports Face1.
+        result = [o["object"] for o in cut["objects"]["created"]][0]
+        mapped = call("selection_set", items=[{"object": result, "sub": ["Face1"]}])["selection"][0]
+        self.assertEqual(mapped["subElements"], ["Face1"])
+        self.assertTrue(mapped["mappedSubElements"][0].startswith(";"))
         self.assertEqual(call("selection_clear")["selection"], [])
         with self.assertRaises(RuntimeError):
             call("selection_set", items=[{"object": "Missing"}])

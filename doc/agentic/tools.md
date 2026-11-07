@@ -501,7 +501,7 @@ No arguments.
 
 ### `project_open`
 
-Open a project folder and make it current. The folder's `.freecad-project.json` is created when missing; with `create` the folder itself is created too. Returns the project info.
+Open a project folder and make it current. The folder's `.freecad-project.json` is created when missing; with `create` the folder itself is created too. Opening a project loads its installed addons and opens its main document when one is set. Returns the project info.
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
@@ -521,7 +521,6 @@ Change project settings and save them to `.freecad-project.json`.
 | `name` | string | no | Project name. |
 | `project` | string | no | Name or folder of an open project to address; defaults to the current project. |
 | `registries` | array of string | no | Addon registry files or URLs. |
-| `scriptsFolder` | string | no | Folder of the agent's Python scripts, relative to the project. |
 
 ### `python_reset`
 

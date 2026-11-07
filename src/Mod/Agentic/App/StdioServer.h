@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cstdio>
 #include <functional>
 #include <string>
 
@@ -35,9 +36,9 @@ protected:
 ///
 /// Lines are read on a worker thread and handed to the main thread through a
 /// queued signal, so every request is executed on the thread that owns the
-/// documents and the Python interpreter, one at a time. Responses are written
-/// to the C stdout stream directly; std::cout is redirected to the FreeCAD
-/// console in GUI mode and must not be used here.
+/// documents and the Python interpreter, one at a time. The server keeps a
+/// private duplicate of stdout for its responses and points descriptor 1 at
+/// stderr, so no other output in the process can corrupt the transport.
 class AgenticExport StdioServer: public QObject
 {
     Q_OBJECT
@@ -53,7 +54,10 @@ private Q_SLOTS:
     void onEndOfInput();
 
 private:
+    static void claimStdout();
     static void writeLine(const std::string& line);
+
+    static FILE* transport;
 
     Protocol& protocol;
     StdinReader* reader {nullptr};

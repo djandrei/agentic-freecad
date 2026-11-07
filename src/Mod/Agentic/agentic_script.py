@@ -20,6 +20,7 @@ import FreeCAD
 import agentic_props
 
 _namespaces = {}
+MAX_OUTPUT = 256 * 1024  # characters of stdout or stderr kept per run
 
 
 class RunTimeout(Exception):
@@ -117,8 +118,14 @@ def run(payload):
     finally:
         sys.stdout, sys.stderr = old_stdout, old_stderr
 
-    result["stdout"] = out.getvalue()
-    result["stderr"] = err.getvalue()
+    for name, stream in (("stdout", out), ("stderr", err)):
+        text = stream.getvalue()
+        if len(text) > MAX_OUTPUT:
+            # Keep the end: the last lines say how a long run ended.
+            result[name] = text[-MAX_OUTPUT:]
+            result[name + "Truncated"] = len(text) - MAX_OUTPUT
+        else:
+            result[name] = text
     result["duration"] = time.monotonic() - started
     return json.dumps(result)
 

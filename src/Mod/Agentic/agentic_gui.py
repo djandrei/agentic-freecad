@@ -113,19 +113,33 @@ def command_info(payload):
     return json.dumps(_command_entry(name))
 
 
+def _element_name(name):
+    """The plain element name (Face1) of a possibly mapped one.
+
+    With topological naming, an element of a shape that has an element map is
+    reported as ';Face1;:H1350,F.Face1'; the indexed name after the last dot
+    is the one shape_elements, selection_set and link properties use.
+    """
+    if name.startswith(";") and "." in name:
+        return name.rsplit(".", 1)[1]
+    return name
+
+
 def selection_get(payload):
     items = []
     for sel in Gui.Selection.getSelectionEx("", 0):
-        items.append(
-            {
-                "document": sel.Document.Name,
-                "object": sel.Object.Name,
-                "label": sel.Object.Label,
-                "type": sel.Object.TypeId,
-                "subElements": list(sel.SubElementNames),
-                "pickedPoints": [[p.x, p.y, p.z] for p in sel.PickedPoints],
-            }
-        )
+        names = list(sel.SubElementNames)
+        item = {
+            "document": sel.Document.Name,
+            "object": sel.Object.Name,
+            "label": sel.Object.Label,
+            "type": sel.Object.TypeId,
+            "subElements": [_element_name(n) for n in names],
+            "pickedPoints": [[p.x, p.y, p.z] for p in sel.PickedPoints],
+        }
+        if item["subElements"] != names:
+            item["mappedSubElements"] = names
+        items.append(item)
     return json.dumps({"selection": items})
 
 

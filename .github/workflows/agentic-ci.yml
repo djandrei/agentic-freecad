@@ -67,6 +67,24 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: pixi run python3 tests/agentic/http_smoke.py ${{ env.builddir }}/bin/FreeCAD
 
+      - name: End-to-end scenario (stdio, both binaries; HTTP; viewer)
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          pixi run python3 tests/agentic/e2e.py stdio ${{ env.builddir }}/bin/FreeCAD
+          pixi run python3 tests/agentic/e2e.py stdio ${{ env.builddir }}/bin/FreeCADCmd
+          pixi run python3 tests/agentic/e2e.py http ${{ env.builddir }}/bin/FreeCAD
+          pixi run xvfb-run -a python3 tests/agentic/e2e.py viewer ${{ env.builddir }}/bin/FreeCAD
+
+      - name: Parity audit is up to date
+        env:
+          QT_QPA_PLATFORM: offscreen
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          AGENTIC_PARITY_MD: /tmp/parity.md
+        run: |
+          pixi run ${{ env.builddir }}/bin/FreeCAD tests/agentic/parity_audit.py
+          diff -u doc/agentic/parity.md /tmp/parity.md
+
       - name: Viewer end-to-end (agent mode under Xvfb)
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"

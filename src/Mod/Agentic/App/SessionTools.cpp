@@ -2,7 +2,10 @@
 
 #include "PreCompiled.h"
 
+#include <Base/Console.h>
+
 #include "AddonTools.h"
+#include "DocumentEngine.h"
 #include "EngineSession.h"
 #include "MessageLog.h"
 #include "Protocol.h"
@@ -78,6 +81,22 @@ std::optional<std::string> optString(const json& args, const char* key)
 namespace Agentic
 {
 
+json prepareOpenedProject(EngineSession& session)
+{
+    json out = {{"addons", loadProjectAddons(session)["loaded"]}};
+    const std::string main = session.project().settings().mainDocument;
+    if (!main.empty()) {
+        try {
+            out["openedMainDocument"] = session.documents().openDocument(main)["name"];
+        }
+        catch (const std::exception& e) {
+            out["mainDocumentError"] = e.what();
+            Base::Console().warning("Agentic: cannot open the main document {}: {}\n", main, e.what());
+        }
+    }
+    return out;
+}
+
 EngineSession& sessionFor(Runtime& runtime, const json& arguments)
 {
     SessionManager& sessions = runtime.sessions();
@@ -107,7 +126,8 @@ void registerSessionTools(Protocol& protocol, Runtime& runtime)
         "project_open",
         "Open a project folder and make it current. The folder's "
         "`.freecad-project.json` is created when missing; with `create` the folder "
-        "itself is created too. Returns the project info.",
+        "itself is created too. Opening a project loads its installed addons and opens its "
+        "main document when one is set. Returns the project info.",
         {{"type", "object"},
          {"properties",
           {{"path", prop("string", "Absolute path of the project folder.")},
@@ -120,7 +140,7 @@ void registerSessionTools(Protocol& protocol, Runtime& runtime)
             EngineSession& session = runtime.sessions().open(args["path"].get<std::string>(), create);
             json info = session.info();
             if (runtime.sessions().list().size() > before) {
-                info["addons"] = loadProjectAddons(session)["loaded"];
+                info.update(prepareOpenedProject(session));
             }
             return info;
         },
@@ -163,8 +183,6 @@ void registerSessionTools(Protocol& protocol, Runtime& runtime)
             {"mainDocument",
              {{"type", {"string", "null"}},
               {"description", "Relative path of the main .FCStd document, or null."}}},
-            {"scriptsFolder",
-             prop("string", "Folder of the agent's Python scripts, relative to the project.")},
             {"addonFolder", prop("string", "Folder for per-project addon installs.")},
             {"autoSave", prop("boolean", "Save documents after every mutating tool call.")},
             {"autoRecompute", prop("boolean", "Recompute after object_set and object_create.")},

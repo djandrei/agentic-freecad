@@ -18,7 +18,6 @@ struct AgenticExport ProjectSettings
 {
     std::string name;
     std::string mainDocument;         ///< relative path of the main `.FCStd`, may be empty
-    std::string scriptsFolder {"."};  ///< where the agent's Python scripts live
     std::string addonFolder {"Mod"};  ///< per-project addon installs, put on the module path
     bool autoSave {true};
     bool autoRecompute {true};

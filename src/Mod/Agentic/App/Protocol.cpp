@@ -22,6 +22,14 @@ constexpr int invalidRequest = -32600;
 constexpr int methodNotFound = -32601;
 constexpr int invalidParams = -32602;
 constexpr int resourceNotFound = -32002;
+constexpr int internalError = -32603;
+
+// Strings reach responses from FreeCAD (console messages, Python output,
+// property values); one invalid UTF-8 byte must not make serialising throw.
+std::string serialize(const json& value)
+{
+    return value.dump(-1, ' ', false, json::error_handler_t::replace);
+}
 
 }  // namespace
 
@@ -87,13 +95,21 @@ std::string Protocol::handleLine(const std::string& line)
 {
     json request = json::parse(line, nullptr, false);
     if (request.is_discarded()) {
-        return error(nullptr, parseError, "Parse error").dump();
+        return serialize(error(nullptr, parseError, "Parse error"));
     }
-    json response = handleRequest(request);
+    json response;
+    try {
+        response = handleRequest(request);
+    }
+    catch (const std::exception& e) {
+        // Nothing may escape into a transport: the server would stop.
+        const json id = request.is_object() && request.contains("id") ? request["id"] : json();
+        return serialize(error(id, internalError, std::string("Internal error: ") + e.what()));
+    }
     if (response.is_discarded() || response.is_null()) {
         return {};
     }
-    return response.dump();
+    return serialize(response);
 }
 
 json Protocol::handleRequest(const json& request)
@@ -235,7 +251,7 @@ json Protocol::callTool(const json& id, const json& params) const
         images = value["_images"];
         value.erase("_images");
     }
-    json content = json::array({{{"type", "text"}, {"text", value.dump()}}});
+    json content = json::array({{{"type", "text"}, {"text", serialize(value)}}});
     for (const auto& image : images) {
         content.push_back({
             {"type", "image"},

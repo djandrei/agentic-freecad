@@ -285,12 +285,15 @@ def stage_v4(tmp):
           shown)
     window.findChild(QToolButton, "Agentic_Code_Toggle").setChecked(True)
 
+    # A distant object, so that fitting one object differs from fitting all;
+    # the double-click goes to a visible object (fitting a hidden one is a no-op).
+    call("object_create", type="Part::Sphere", name="Far", properties={"Placement": {"base": [300, 0, 0]}})
     agent = call("camera_set", view="isometric", fit="all")
     tree = window.findChild(QTreeWidget, "Agentic_ModelPanel")
     iterator = QTreeWidgetItemIterator(tree)
     while iterator.value():
         item = iterator.value()
-        if item.data(0, 0x0100 + 1) == "Box":
+        if item.data(0, 0x0100 + 1) == "AfterPause":
             tree.itemDoubleClicked.emit(item, 0)
             break
         iterator += 1

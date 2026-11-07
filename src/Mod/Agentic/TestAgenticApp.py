@@ -131,6 +131,38 @@ class ProjectToolsTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             call("project_open", path=os.path.join(self.root, "missing"))
 
+    def test_main_document_opens_with_the_project(self):
+        call("project_open", path=self.root)
+        call("document_new", name="AgenticMainDoc")
+        call("object_create", type="Part::Box", name="Kept")
+        call("project_set", mainDocument="AgenticMainDoc.FCStd")
+        call("document_close", document="AgenticMainDoc")
+        other = os.path.join(self.root, "elsewhere")
+        call("project_open", path=other, create=True)
+        # A second open of an already open project is a switch, not an open.
+        self.assertNotIn("openedMainDocument", call("project_open", path=self.root))
+        # Reopening in a fresh session is what opens it: emulate with a copy.
+        copy = os.path.join(self.root, "copy")
+        os.makedirs(copy)
+        import shutil
+
+        shutil.copy(
+            os.path.join(self.root, "AgenticMainDoc.FCStd"), os.path.join(copy, "Main.FCStd")
+        )
+        with open(os.path.join(copy, ".freecad-project.json"), "w") as handle:
+            json.dump({"mainDocument": "Main.FCStd"}, handle)
+        opened = call("project_open", path=copy)
+        self.assertEqual(opened["openedMainDocument"], "Main")
+        self.assertEqual(
+            [o["name"] for o in call("object_list", document="Main")["objects"]], ["Kept"]
+        )
+        call("document_close", document="Main")
+        broken = os.path.join(self.root, "broken")
+        os.makedirs(broken)
+        with open(os.path.join(broken, ".freecad-project.json"), "w") as handle:
+            json.dump({"mainDocument": "Missing.FCStd"}, handle)
+        self.assertIn("no such file", call("project_open", path=broken)["mainDocumentError"])
+
     def test_project_set_persists(self):
         call("project_open", path=self.root)
         info = call("project_set", mainDocument="main.FCStd", autoRecompute=False)
@@ -441,6 +473,9 @@ class PythonRunTest(unittest.TestCase):
         self.assertIn("scripts/make.py", changes[-2]["summary"])
 
     def test_timeout_stops_python(self):
+        flood = call("python_run", code="print('x' * 1000000)")
+        self.assertEqual(len(flood["stdout"]), 256 * 1024)
+        self.assertEqual(flood["stdoutTruncated"], 1000001 - 256 * 1024)
         run = call("python_run", code="while True:\n    pass", timeoutSeconds=0.5)
         self.assertFalse(run["ok"])
         self.assertTrue(run["timedOut"])

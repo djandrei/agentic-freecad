@@ -77,7 +77,10 @@ void registerGuiTools(Protocol& protocol, Runtime& runtime)
             {"name"}
         ),
         [&runtime](const json& args) -> json {
+            runtime.takeDialogs();
             json out = py("activate_workbench", args);
+            // Some workbenches ask something on first activation (BIM's welcome).
+            out["dialogs"] = runtime.takeDialogs();
             if (EngineSession* session = runtime.sessions().current()) {
                 ChangeEntry entry;
                 entry.kind = "workbench";

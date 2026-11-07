@@ -2,6 +2,16 @@
 
 #include "PreCompiled.h"
 
+#ifdef _WIN32
+# include <io.h>
+# define dup _dup
+# define dup2 _dup2
+# define fileno _fileno
+# define fdopen _fdopen
+#else
+# include <unistd.h>
+#endif
+
 #include <Base/Console.h>
 
 #include "Protocol.h"
@@ -40,6 +50,7 @@ void StdioServer::start()
     if (reader) {
         return;
     }
+    claimStdout();
     reader = new StdinReader();
     connect(reader, &StdinReader::lineRead, this, &StdioServer::onLine, Qt::QueuedConnection);
     connect(reader, &StdinReader::endOfInput, this, &StdioServer::onEndOfInput, Qt::QueuedConnection);
@@ -64,11 +75,33 @@ void StdioServer::onEndOfInput()
     QCoreApplication::quit();
 }
 
+FILE* StdioServer::transport = nullptr;
+
+void StdioServer::claimStdout()
+{
+    // The transport gets a private duplicate of stdout and descriptor 1 is
+    // pointed at stderr, so nothing else in the process (a Python print in
+    // the console binary, a C library writing to stdout, an addon) can put a
+    // stray line between two JSON-RPC messages.
+    std::fflush(stdout);
+    const int out = dup(fileno(stdout));
+    if (out < 0) {
+        transport = stdout;
+        return;
+    }
+    dup2(fileno(stderr), fileno(stdout));
+    transport = fdopen(out, "w");
+    if (!transport) {
+        transport = stdout;
+    }
+}
+
 void StdioServer::writeLine(const std::string& line)
 {
-    std::fwrite(line.data(), 1, line.size(), stdout);
-    std::fputc('\n', stdout);
-    std::fflush(stdout);
+    FILE* target = transport ? transport : stdout;
+    std::fwrite(line.data(), 1, line.size(), target);
+    std::fputc('\n', target);
+    std::fflush(target);
 }
 
 }  // namespace Agentic

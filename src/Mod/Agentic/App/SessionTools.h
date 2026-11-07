@@ -18,6 +18,11 @@ class EngineSession;
 /// when there is none.
 AgenticExport EngineSession& sessionFor(Runtime& runtime, const nlohmann::json& arguments);
 
+/// What opening a project brings into the session: its installed addons are
+/// loaded and its main document, when set and not open yet, is opened.
+/// Problems are reported in the result, not thrown.
+AgenticExport nlohmann::json prepareOpenedProject(EngineSession& session);
+
 /// Registers the project, file, log and change tools.
 AgenticExport void registerSessionTools(Protocol& protocol, Runtime& runtime);
 
