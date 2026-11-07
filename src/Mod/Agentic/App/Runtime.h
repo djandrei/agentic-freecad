@@ -9,6 +9,7 @@
 #include <Mod/Agentic/AgenticGlobal.h>
 
 #include "AgentConfig.h"
+#include "SessionObserver.h"
 
 namespace Agentic
 {
@@ -17,6 +18,8 @@ class Protocol;
 class StdioServer;
 class HttpServer;
 class StderrLogger;
+class MessageLog;
+class SessionManager;
 
 /// The one agent-mode runtime of the process.
 ///
@@ -33,6 +36,9 @@ public:
 
     const AgentConfig& config() const;
     Protocol& protocol();
+    MessageLog& messages();
+    SessionManager& sessions();
+    ObserverList& observers();
 
     /// Starts the configured transport. Returns true when a transport is now
     /// running; false when agent mode is off or the transport failed.
@@ -60,6 +66,9 @@ private:
     void forwardActivity(const std::string& line);
 
     AgentConfig cfg;
+    ObserverList observerList;
+    std::unique_ptr<MessageLog> messageLog;
+    std::unique_ptr<SessionManager> sessionManager;
     std::unique_ptr<Protocol> proto;
     std::unique_ptr<StdioServer> stdio;
     std::unique_ptr<HttpServer> http;

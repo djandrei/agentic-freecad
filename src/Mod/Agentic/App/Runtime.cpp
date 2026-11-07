@@ -5,9 +5,13 @@
 #include <Base/Console.h>
 #include <Base/Interpreter.h>
 
+#include "EngineSession.h"
 #include "HttpServer.h"
+#include "MessageLog.h"
 #include "Protocol.h"
 #include "Runtime.h"
+#include "SessionManager.h"
+#include "SessionTools.h"
 #include "StderrLogger.h"
 #include "StdioServer.h"
 #include "Tools.h"
@@ -26,11 +30,27 @@ Runtime& Runtime::instance()
 
 Runtime::Runtime()
     : cfg(AgentConfig::fromApplication())
+    , messageLog(std::make_unique<MessageLog>())
+    , sessionManager(std::make_unique<SessionManager>(observerList))
     , proto(std::make_unique<Protocol>())
 {
+    Base::Console().attachObserver(messageLog.get());
+
     registerCoreTools(*proto, *this);
     registerCoreResources(*proto, *this);
     registerCorePrompts(*proto);
+    registerSessionTools(*proto, *this);
+
+    proto->setToolHooks(
+        [this](const std::string& name, const nlohmann::json&) {
+            for (EngineSession* session : sessionManager->list()) {
+                session->setCurrentTool(name);
+            }
+        },
+        [this](const std::string& name, const nlohmann::json& args, double ms, bool ok) {
+            observerList.each([&](SessionObserver& o) { o.toolCalled(name, args, ms, ok); });
+        }
+    );
 }
 
 Runtime::~Runtime() = default;
@@ -43,6 +63,21 @@ const AgentConfig& Runtime::config() const
 Protocol& Runtime::protocol()
 {
     return *proto;
+}
+
+MessageLog& Runtime::messages()
+{
+    return *messageLog;
+}
+
+SessionManager& Runtime::sessions()
+{
+    return *sessionManager;
+}
+
+ObserverList& Runtime::observers()
+{
+    return observerList;
 }
 
 void Runtime::forwardActivity(const std::string& line)
@@ -59,6 +94,15 @@ bool Runtime::start()
     }
     if (isRunning()) {
         return true;
+    }
+
+    if (!cfg.project.empty()) {
+        try {
+            sessionManager->open(cfg.project, true);
+        }
+        catch (const std::exception& e) {
+            Base::Console().error("Agentic: cannot open project {}: {}\n", cfg.project, e.what());
+        }
     }
 
     if (cfg.stdio) {

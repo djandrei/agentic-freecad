@@ -2,6 +2,8 @@
 
 #include "PreCompiled.h"
 
+#include <chrono>
+
 #include <App/Application.h>
 
 #include "Protocol.h"
@@ -56,6 +58,12 @@ const std::map<std::string, Protocol::Tool>& Protocol::toolList() const
 void Protocol::setInstructions(std::string text)
 {
     instructions = std::move(text);
+}
+
+void Protocol::setToolHooks(ToolStartHook start, ToolFinishHook finish)
+{
+    onToolStart = std::move(start);
+    onToolFinish = std::move(finish);
 }
 
 std::string Protocol::serverVersion()
@@ -173,16 +181,31 @@ json Protocol::callTool(const json& id, const json& params) const
         return error(id, invalidParams, name + ": " + *problem);
     }
 
+    if (onToolStart) {
+        onToolStart(name, arguments);
+    }
+    const auto started = std::chrono::steady_clock::now();
+    auto elapsed = [&started]() {
+        return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started)
+            .count();
+    };
+
     json value;
     try {
         value = it->second.handler(arguments);
     }
     catch (const std::exception& e) {
+        if (onToolFinish) {
+            onToolFinish(name, arguments, elapsed(), false);
+        }
         json failure = {
             {"content", json::array({{{"type", "text"}, {"text", e.what()}}})},
             {"isError", true},
         };
         return result(id, failure);
+    }
+    if (onToolFinish) {
+        onToolFinish(name, arguments, elapsed(), true);
     }
 
     json success = {

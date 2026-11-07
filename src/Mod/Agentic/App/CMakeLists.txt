@@ -15,15 +15,31 @@ set(Agentic_SRCS
     AgentConfig.cpp
     AgentConfig.h
     AppAgentic.cpp
+    ChangeLog.cpp
+    ChangeLog.h
+    EngineSession.cpp
+    EngineSession.h
+    FileStore.cpp
+    FileStore.h
     HttpServer.cpp
     HttpServer.h
+    MessageLog.cpp
+    MessageLog.h
     PreCompiled.h
+    Project.cpp
+    Project.h
+    ProjectSession.h
     Protocol.cpp
     Protocol.h
     Runtime.cpp
     Runtime.h
     Schema.cpp
     Schema.h
+    SessionManager.cpp
+    SessionManager.h
+    SessionObserver.h
+    SessionTools.cpp
+    SessionTools.h
     StderrLogger.cpp
     StderrLogger.h
     StdioServer.cpp

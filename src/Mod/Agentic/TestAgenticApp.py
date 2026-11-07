@@ -2,6 +2,8 @@
 """Console tests of the Agentic module: the MCP protocol answered in-process."""
 
 import json
+import os
+import tempfile
 import unittest
 
 import FreeCAD
@@ -14,6 +16,17 @@ def rpc(method, params=None, request_id=1):
         request["params"] = params
     response = Agentic.handleRequest(json.dumps(request))
     return json.loads(response)
+
+
+def call(tool, **arguments):
+    """Call a tool; return structuredContent, or raise with the tool error text."""
+    response = rpc("tools/call", {"name": tool, "arguments": arguments})
+    if "error" in response:
+        raise AssertionError(f"{tool}: protocol error {response['error']}")
+    result = response["result"]
+    if result["isError"]:
+        raise RuntimeError(result["content"][0]["text"])
+    return result["structuredContent"]
 
 
 class AgenticModuleTest(unittest.TestCase):
@@ -95,3 +108,95 @@ class AgenticProtocolTest(unittest.TestCase):
         self.assertIn("### `version`", text)
         self.assertIn("agentic://status", text)
         self.assertIn("### `agentic-loop`", text)
+
+
+class ProjectToolsTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = os.path.realpath(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_project_open_creates_settings_and_is_current(self):
+        info = call("project_open", path=self.root)
+        self.assertEqual(info["root"], self.root)
+        self.assertTrue(os.path.exists(os.path.join(self.root, ".freecad-project.json")))
+        listed = call("project_list")
+        self.assertEqual(listed["current"], self.root)
+        self.assertIn(self.root, [p["root"] for p in listed["projects"]])
+        created = os.path.join(self.root, "sub", "p")
+        info = call("project_open", path=created, create=True)
+        self.assertEqual(info["name"], "p")
+        with self.assertRaises(RuntimeError):
+            call("project_open", path=os.path.join(self.root, "missing"))
+
+    def test_project_set_persists(self):
+        call("project_open", path=self.root)
+        info = call("project_set", mainDocument="main.FCStd", autoRecompute=False)
+        self.assertEqual(info["mainDocument"], "main.FCStd")
+        self.assertFalse(info["autoRecompute"])
+        with open(os.path.join(self.root, ".freecad-project.json")) as handle:
+            self.assertEqual(json.load(handle)["mainDocument"], "main.FCStd")
+        info = call("project_set", mainDocument=None)
+        self.assertIsNone(info["mainDocument"])
+        changes = call("changes_get")["changes"]
+        self.assertEqual([c["kind"] for c in changes], ["project", "project"])
+
+    def test_file_tools_round_trip(self):
+        call("project_open", path=self.root)
+        written = call("file_write", path="scripts/box.py", content="import Part\n")
+        self.assertTrue(written["created"])
+        self.assertEqual(written["hunk"]["linesAdded"], 1)
+        read = call("file_read", path="scripts/box.py")
+        self.assertEqual(read["content"], "import Part\n")
+        self.assertEqual(read["version"], written["version"])
+
+        edited = call(
+            "file_write",
+            path="scripts/box.py",
+            edits=[{"oldText": "import Part", "newText": "import Part, FreeCAD"}],
+            baseVersion=read["version"],
+        )
+        self.assertFalse(edited["created"])
+        self.assertEqual(
+            call("file_read", path="scripts/box.py")["content"], "import Part, FreeCAD\n"
+        )
+        with self.assertRaises(RuntimeError) as conflict:
+            call("file_write", path="scripts/box.py", content="x", baseVersion=read["version"])
+        self.assertIn("changed since", str(conflict.exception))
+        with self.assertRaises(RuntimeError):
+            call("file_write", path="scripts/box.py")
+
+        listing = call("file_list", recursive=True)["entries"]
+        self.assertIn("scripts/box.py", [e["path"] for e in listing])
+        self.assertNotIn(".freecad-project.json", [e["path"] for e in listing])
+        call("file_rename", **{"from": "scripts/box.py", "to": "box.py"})
+        call("file_delete", path="box.py")
+        call("file_delete", path="scripts")
+        self.assertEqual(call("file_list")["entries"], [])
+        with self.assertRaises(RuntimeError):
+            call("file_read", path="../etc/passwd")
+
+        kinds = [c["kind"] for c in call("changes_get")["changes"]]
+        self.assertEqual(kinds, ["file"] * 5)
+        summaries = [c["summary"] for c in call("changes_get")["changes"]]
+        self.assertTrue(summaries[0].startswith("created scripts/box.py"))
+
+    def test_log_get_sees_console_messages(self):
+        before = call("log_get", limit=1)["next"]
+        FreeCAD.Console.PrintWarning("agentic test warning\n")
+        FreeCAD.Console.PrintError("agentic test error\n")
+        FreeCAD.Console.PrintMessage("agentic test message\n")
+        logged = call("log_get", since=before)["messages"]
+        texts = [(m["level"], m["text"]) for m in logged]
+        self.assertIn(("warning", "agentic test warning"), texts)
+        self.assertIn(("error", "agentic test error"), texts)
+        self.assertIn(("message", "agentic test message"), texts)
+        errors = call("log_get", since=before, level="error")["messages"]
+        self.assertEqual([m["level"] for m in errors], ["error"])
+
+    def test_no_project_is_an_error(self):
+        # Projects opened by other tests stay open; address a name that is not.
+        with self.assertRaises(RuntimeError):
+            call("file_list", project="no-such-project")

@@ -5,7 +5,27 @@ Context Protocol (MCP) server drives FreeCAD, and a viewer window shows a
 person what the agent is doing. The design is in `DESIGN.md` at the root of
 the parent workspace; this folder documents what is built.
 
-## Status: stage 1
+## Status: stage 2
+
+Stage 2 added projects, files and the session layer:
+
+- a project is a folder with `.freecad-project.json` (name, main document,
+  scripts and addon folders, `autoSave`, `autoRecompute`, registries),
+  created on first `project_open`; `--project DIR` opens one at start;
+  several projects can be open, the one the last tool call addressed is
+  current;
+- the file sandbox: every path resolves under the project root with
+  symlinks followed, writes are atomic and versioned by content hash,
+  `baseVersion` detects concurrent changes, exact-text edits must match
+  once, hidden entries are skipped;
+- the message log (every console message, sequence-numbered, thread-safe)
+  and the per-project change log (every mutation, with the equivalent
+  Python where there is one);
+- `SessionObserver`, the event interface the viewer will implement, and
+  tool-call timing delivered to it;
+- tools: `project_open`, `project_list`, `project_info`, `project_set`,
+  `file_list`, `file_read`, `file_write`, `file_rename`, `file_delete`,
+  `log_get`, `changes_get`.
 
 Stage 1 completed the protocol and transports on top of the stage 0 skeleton:
 

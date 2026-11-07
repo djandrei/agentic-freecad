@@ -28,6 +28,9 @@ public:
     using ToolHandler = std::function<nlohmann::json(const nlohmann::json& arguments)>;
     using ResourceReader = std::function<std::string()>;
     using PromptRenderer = std::function<std::string(const nlohmann::json& arguments)>;
+    using ToolStartHook = std::function<void(const std::string& name, const nlohmann::json& arguments)>;
+    using ToolFinishHook = std::function<
+        void(const std::string& name, const nlohmann::json& arguments, double milliseconds, bool ok)>;
 
     struct Tool
     {
@@ -74,6 +77,9 @@ public:
 
     void setInstructions(std::string text);
 
+    /// Called before a tool handler runs and after it returned or threw.
+    void setToolHooks(ToolStartHook start, ToolFinishHook finish);
+
     /// Handles one line of input. Returns the serialized response, or an empty
     /// string when no response is due (notification).
     std::string handleLine(const std::string& line);
@@ -100,6 +106,8 @@ private:
     std::map<std::string, Resource> resources;
     std::map<std::string, Prompt> prompts;
     std::string instructions;
+    ToolStartHook onToolStart;
+    ToolFinishHook onToolFinish;
 };
 
 }  // namespace Agentic
