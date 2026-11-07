@@ -418,3 +418,8 @@ else(WIN32)
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
 endif(WIN32)
+
+if(BUILD_AGENTIC)
+    # App/Application.cpp registers the --agent* program options
+    target_compile_definitions(FreeCADApp PRIVATE BUILD_AGENTIC)
+endif(BUILD_AGENTIC)

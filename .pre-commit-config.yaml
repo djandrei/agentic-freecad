@@ -9,6 +9,7 @@ files: |
         src/Gui|
         src/Main|
         src/Tools|
+        src/Mod/Agentic|
         src/Mod/Assembly|
         src/Mod/BIM|
         src/Mod/CAM|

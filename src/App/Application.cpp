@@ -2472,6 +2472,13 @@ void parseProgramOptions(int ac, char ** av, const std::string& exe, boost::prog
     ("single-instance", "Allow to run a single instance of the application")
     ("safe-mode", "Force enable safe mode")
     ("pass", boost::program_options::value< std::vector<std::string> >()->multitoken(), "Ignores the following arguments and pass them through to be used by a script")
+#ifdef BUILD_AGENTIC
+    ("agent", "Start in agent mode: an MCP server drives the application and a viewer window shows its work")
+    ("agent-stdio", "Agent mode with the MCP server on stdin/stdout and no window")
+    ("agent-port", boost::program_options::value<int>(), "Agent mode: serve MCP over HTTP on this loopback port")
+    ("agent-headless", "Agent mode without a window")
+    ("project", boost::program_options::value<std::string>(), "Agent mode: project folder to open")
+#endif
     ;
 
 
@@ -2671,6 +2678,32 @@ void processProgramOptions(const boost::program_options::variables_map& vm, std:
     if (vm.contains("hidden")) {
         mConfig["StartHidden"] = "1";
     }
+
+#ifdef BUILD_AGENTIC
+    if (vm.contains("agent") || vm.contains("agent-stdio") || vm.contains("agent-port")
+        || vm.contains("agent-headless")) {
+        mConfig["AgentMode"] = "1";
+        if (vm.contains("agent-stdio")) {
+            mConfig["AgentStdio"] = "1";
+            mConfig["AgentHeadless"] = "1";
+            // stdout belongs to the MCP transport; the standard console observer prints
+            // messages there, so it is silenced and the Agentic module logs to stderr.
+            mConfig["LoggingConsole"] = "0";
+        }
+        if (vm.contains("agent-headless")) {
+            mConfig["AgentHeadless"] = "1";
+        }
+        if (vm.contains("agent-port")) {
+            mConfig["AgentPort"] = std::to_string(vm["agent-port"].as<int>());
+        }
+        // A headless launch does not use StartHidden: that mode skips guiInitialized
+        // and quits after processing files. The Agentic module's Init.py selects the
+        // offscreen Qt platform instead, so no window ever appears.
+    }
+    if (vm.contains("project")) {
+        mConfig["AgentProject"] = vm["project"].as<std::string>();
+    }
+#endif
 
     if (vm.contains("write-log")) {
         mConfig["LoggingFile"] = "1";

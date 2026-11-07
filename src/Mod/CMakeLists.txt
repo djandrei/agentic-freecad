@@ -6,6 +6,10 @@ if(BUILD_ADDONMGR)
   add_subdirectory(AddonManager)
 endif(BUILD_ADDONMGR)
 
+if(BUILD_AGENTIC)
+  add_subdirectory(Agentic)
+endif(BUILD_AGENTIC)
+
 if(BUILD_BIM)
   add_subdirectory(BIM)
 endif(BUILD_BIM)

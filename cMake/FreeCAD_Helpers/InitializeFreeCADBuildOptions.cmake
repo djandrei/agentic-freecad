@@ -180,6 +180,7 @@ macro(InitializeFreeCADBuildOptions)
     option(BUILD_TECHDRAW "Build the FreeCAD Technical Drawing module" ON)
     option(BUILD_TUX "Build the FreeCAD Tux module" ON)
     option(BUILD_WEB "Build the FreeCAD Web module" ON)
+    option(BUILD_AGENTIC "Build the FreeCAD Agentic module (MCP server and agent viewer)" ON)
     option(BUILD_SURFACE "Build the FreeCAD surface module" ON)
     option(ENABLE_DEVELOPER_TESTS "Build the FreeCAD unit tests suit" ON)
 
