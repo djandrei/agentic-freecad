@@ -46,6 +46,13 @@ public:
     {}
     virtual void changeLogged(const Project& /*project*/, const ChangeEntry& /*entry*/)
     {}
+    /// event: opened, created, saved, closed, recomputed, undo, redo, objects
+    virtual void documentChanged(
+        const Project& /*project*/,
+        const std::string& /*document*/,
+        const std::string& /*event*/
+    )
+    {}
     virtual void toolCalled(
         const std::string& /*name*/,
         const nlohmann::json& /*arguments*/,

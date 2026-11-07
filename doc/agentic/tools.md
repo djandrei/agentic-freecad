@@ -2,7 +2,7 @@
 
 Generated from the server's registry by `src/Mod/Agentic/tools_reference.py`; do not edit by hand.
 
-13 tools, 1 resources, 1 prompts.
+29 tools, 1 resources, 1 prompts.
 
 ## Tools
 
@@ -15,6 +15,80 @@ The change log of a project: every mutating operation in order, with the equival
 | `limit` | integer | no | Maximum number of entries. Default 200. |
 | `project` | string | no | Name or folder of an open project to address; defaults to the current project. |
 | `since` | integer | no | First sequence number to return. Default 1. |
+
+### `document_close`
+
+Close a document. Unsaved changes are lost unless autoSave is on.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `document_list`
+
+Documents of the project: the open ones (with undo depth, object counts and errors) and the .FCStd files in the folder.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `document_new`
+
+Create a new document in the project and make it active. With autoSave it is written to <name>.FCStd (or `file`) at once and after every change.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `file` | string | no | File path relative to the project root. Default: <name>.FCStd. |
+| `name` | string | no | Document name (also the label). Default: FreeCAD chooses. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `document_open`
+
+Open an .FCStd file of the project folder and make it the active document.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `file` | string | yes | File path relative to the project root. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `document_recompute`
+
+Recompute a document. Returns the number of recomputed objects, every object in error with its status, and the console messages of the run.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `force` | boolean | no | Recompute even if nothing is touched. Default false. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `document_redo`
+
+Redo the last undone transaction of a document.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `document_save`
+
+Save a document to its file, or to `as` (relative to the project root).
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `as` | string | no | New file path; the document keeps using it. |
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `document_undo`
+
+Undo the last transaction of a document (one mutating tool call).
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
 
 ### `file_delete`
 
@@ -75,6 +149,92 @@ Messages FreeCAD printed (errors, warnings, messages, log lines), newest last. P
 | `level` | string ("all", "warning", "error") | no | Minimum severity: all, warning (warnings and errors) or error. Default all. |
 | `limit` | integer | no | Maximum number of entries. Default 200. |
 | `since` | integer | no | First sequence number to return. Default 1. |
+
+### `object_create`
+
+Create an object of a type (Part::Box, Part::Cylinder, PartDesign::Body, Sketcher::SketchObject, Part::Cut, App::Part, ...) and set initial properties in one transaction. Values by property type: numbers and strings as is; quantities as a number in internal units (mm, deg) or a string with unit ("10 mm"); vectors as [x, y, z]; placements as {base: [x,y,z], rotation: {axis: [x,y,z], angle: deg}}; links as an object name or {object, sub: ["Face1"]}; link lists as arrays of those; enumerations as the option string; colors as [r, g, b] in 0..1. {expression: "Box.Length * 2"} binds an expression, {expression: null} clears it.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `name` | string | no | Internal name. Default: derived from the type. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `properties` | object | no | Initial property values. |
+| `type` | string | yes | Object type id, e.g. Part::Box. |
+| `view` | object | no | Initial view-provider property values. |
+
+### `object_delete`
+
+Delete an object. Objects that depended on it are reported and left touched.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `object` | string | yes | Object name or unique label. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `object_dependencies`
+
+The dependency graph of a document, or of one object with everything it depends on and everything that depends on it.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `object` | string | no | Limit to this object's neighbourhood. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `object_get`
+
+Everything about one object: type, status, every property with type, group, documentation, value, expression and enumeration options, the view-provider properties under `view` when the GUI is available, dependencies, and a shape summary for geometry.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `object` | string | yes | Object name or unique label. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `properties` | array of string | no | Only these properties. Default: all. |
+| `view` | boolean | no | Include view-provider properties. Default true. |
+
+### `object_list`
+
+Objects of a document with type, label, status, visibility and dependency names.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `type` | string | no | Only objects derived from this type, e.g. Part::Feature. |
+
+### `object_set`
+
+Set properties of an object (and of its view provider under `view`) in one transaction; recomputes and saves according to the project settings. Values by property type: numbers and strings as is; quantities as a number in internal units (mm, deg) or a string with unit ("10 mm"); vectors as [x, y, z]; placements as {base: [x,y,z], rotation: {axis: [x,y,z], angle: deg}}; links as an object name or {object, sub: ["Face1"]}; link lists as arrays of those; enumerations as the option string; colors as [r, g, b] in 0..1. {expression: "Box.Length * 2"} binds an expression, {expression: null} clears it.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `object` | string | yes | Object name or unique label. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `properties` | object | no | Property name to value. |
+| `view` | object | no | View-provider property name to value (ShapeAppearance, Transparency, LineWidth, DisplayMode, Visibility, ...). |
+
+### `preferences_get`
+
+Read a group of the user preferences (the parameter tree behind the Preferences dialog): its sub-groups and its values with types. Paths are relative to "User parameter:", e.g. BaseApp/Preferences/Units.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `path` | string | yes | Group path, e.g. BaseApp/Preferences/Units. |
+
+### `preferences_set`
+
+Set one preference value. The type follows the JSON value (bool, int, float, string) unless `type` says otherwise; `unsigned` is for colour values. Pass `value: null` to remove the key.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `key` | string | yes | Value name inside the group. |
+| `path` | string | yes | Group path, e.g. BaseApp/Preferences/Units. |
+| `type` | string ("bool", "int", "unsigned", "float", "string") | no | Stored type; default from the value. |
+| `value` | boolean | integer | number | string | null | yes | The new value. |
 
 ### `project_info`
 

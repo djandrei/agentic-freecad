@@ -6,6 +6,7 @@
 #include <fstream>
 
 #include <Mod/Agentic/App/EngineSession.h>
+#include <Mod/Agentic/App/MessageLog.h>
 #include <Mod/Agentic/App/Project.h>
 #include <Mod/Agentic/App/SessionManager.h>
 
@@ -81,7 +82,8 @@ TEST_F(ProjectTest, sessionManagerOpensOnceAndNotifies)
     Agentic::ObserverList observers;
     Recorder recorder;
     observers.add(&recorder);
-    Agentic::SessionManager manager(observers);
+    Agentic::MessageLog messages;
+    Agentic::SessionManager manager(observers, messages);
 
     Agentic::EngineSession& a = manager.open(root, false);
     EXPECT_TRUE(Agentic::Project::exists(root));

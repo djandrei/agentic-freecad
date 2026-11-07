@@ -200,3 +200,161 @@ class ProjectToolsTest(unittest.TestCase):
         # Projects opened by other tests stay open; address a name that is not.
         with self.assertRaises(RuntimeError):
             call("file_list", project="no-such-project")
+
+
+class DocumentToolsTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = os.path.realpath(self.tmp.name)
+        call("project_open", path=self.root)
+        self.doc = call("document_new", name="AgenticDocTest")["name"]
+
+    def tearDown(self):
+        for info in call("document_list")["documents"]:
+            call("document_close", document=info["name"])
+        self.tmp.cleanup()
+
+    def test_new_document_is_saved_and_listed(self):
+        self.assertTrue(os.path.exists(os.path.join(self.root, self.doc + ".FCStd")))
+        listed = call("document_list")
+        self.assertEqual(listed["active"], self.doc)
+        self.assertEqual([d["name"] for d in listed["documents"]], [self.doc])
+        self.assertTrue(listed["files"][0]["open"])
+
+    def test_create_set_get_box(self):
+        created = call(
+            "object_create",
+            type="Part::Box",
+            name="MyBox",
+            properties={"Length": "20 mm", "Width": 10, "Height": 5},
+        )
+        self.assertEqual(created["object"], "MyBox")
+        self.assertFalse(created["recompute"]["hasError"])
+        self.assertTrue(created["saved"])
+
+        info = call("object_get", object="MyBox")
+        self.assertEqual(info["type"], "Part::Box")
+        length = info["properties"]["Length"]
+        self.assertEqual(length["type"], "App::PropertyLength")
+        self.assertAlmostEqual(length["value"]["value"], 20.0)
+        self.assertEqual(info["shape"]["shape"], "Solid")
+        self.assertAlmostEqual(info["shape"]["volume"], 1000.0)
+        self.assertNotIn("view", info)  # the console binary has no GUI layer
+
+        changed = call(
+            "object_set",
+            object="MyBox",
+            properties={
+                "Height": {"expression": "MyBox.Width * 2"},
+                "Placement": {"base": [1, 2, 3], "rotation": {"axis": [0, 0, 1], "angle": 90}},
+                "Label": "The box",
+            },
+        )
+        self.assertEqual(sorted(changed["changed"]), ["Height", "Label", "Placement"])
+        info = call("object_get", object="MyBox", properties=["Height", "Placement"])
+        # FreeCAD stores a self reference without the object prefix.
+        self.assertTrue(info["properties"]["Height"]["expression"].endswith("Width * 2"))
+        self.assertAlmostEqual(info["properties"]["Height"]["value"]["value"], 20.0)
+        self.assertEqual(info["properties"]["Placement"]["value"]["base"], [1.0, 2.0, 3.0])
+        self.assertAlmostEqual(info["properties"]["Placement"]["value"]["rotation"]["angle"], 90.0)
+        self.assertEqual(call("object_get", object="The box")["name"], "MyBox")
+
+        with self.assertRaises(RuntimeError):
+            call("object_set", object="MyBox", properties={"NoSuchProperty": 1})
+        with self.assertRaises(RuntimeError):
+            call("object_set", object="MyBox", view={"Transparency": 50})
+
+        kinds = [c["kind"] for c in call("changes_get")["changes"]]
+        self.assertIn("object", kinds)
+        self.assertIn("property", kinds)
+        python = [c["python"] for c in call("changes_get")["changes"] if c["kind"] == "property"][0]
+        self.assertIn('setExpression("Height"', python)
+        self.assertIn("App.Placement(", python)
+
+    def test_links_errors_undo_redo_dependencies(self):
+        call("object_create", type="Part::Box", name="A")
+        call(
+            "object_create", type="Part::Cylinder", name="B", properties={"Radius": 2, "Height": 20}
+        )
+        cut = call("object_create", type="Part::Cut", name="Cut")
+        self.assertTrue(cut["recompute"]["hasError"])
+        self.assertEqual([e["name"] for e in cut["recompute"]["objectsInError"]], ["Cut"])
+
+        fixed = call("object_set", object="Cut", properties={"Base": "A", "Tool": {"object": "B"}})
+        self.assertFalse(fixed["recompute"]["hasError"])
+        info = call("object_get", object="Cut", properties=["Base", "Tool"])
+        self.assertEqual(info["properties"]["Base"]["value"], {"object": "A"})
+        self.assertEqual(info["outList"], ["A", "B"])
+        self.assertLess(info["shape"]["volume"], 1000.0)
+
+        deps = call("object_dependencies", object="Cut")
+        self.assertIn({"from": "Cut", "to": "A"}, deps["dependsOn"])
+        self.assertEqual({n["name"] for n in deps["objects"]}, {"A", "B", "Cut"})
+
+        undone = call("document_undo")
+        self.assertTrue(undone["undone"])
+        self.assertEqual(undone["transaction"], "object_set Cut")
+        self.assertIsNone(
+            call("object_get", object="Cut", properties=["Base"])["properties"]["Base"]["value"]
+        )
+        redone = call("document_redo")
+        self.assertTrue(redone["redone"])
+        self.assertEqual(
+            call("object_get", object="Cut", properties=["Base"])["properties"]["Base"]["value"],
+            {"object": "A"},
+        )
+
+        deleted = call("object_delete", object="B")
+        self.assertEqual(deleted["dependentsTouched"], ["Cut"])
+        self.assertTrue(deleted["recompute"]["hasError"])
+        self.assertEqual(len(call("object_list")["objects"]), 2)
+        boxes = call("object_list", type="Part::Box")["objects"]
+        self.assertEqual([o["name"] for o in boxes], ["A"])
+
+    def test_close_and_reopen_from_file(self):
+        call("object_create", type="Part::Box", name="Kept")
+        file = call("document_list")["documents"][0]["file"]
+        closed = call("document_close")
+        self.assertTrue(closed["closed"])
+        self.assertIsNone(closed["active"])
+        reopened = call("document_open", file=file)
+        self.assertEqual(reopened["objects"], 1)
+        self.assertEqual(call("object_list")["objects"][0]["name"], "Kept")
+        with self.assertRaises(RuntimeError):
+            call("document_open", file="../outside.FCStd")
+        saved = call("document_save", **{"as": "copies/kept-copy.FCStd"})
+        self.assertEqual(saved["file"], "copies/kept-copy.FCStd")
+        self.assertTrue(os.path.exists(os.path.join(self.root, "copies", "kept-copy.FCStd")))
+
+    def test_unknown_type_is_an_error(self):
+        with self.assertRaises(RuntimeError) as err:
+            call("object_create", type="Nope::Thing")
+        self.assertIn("unknown object type", str(err.exception))
+
+
+class PreferenceToolsTest(unittest.TestCase):
+    PATH = "BaseApp/Preferences/Mod/AgenticTest"
+
+    def tearDown(self):
+        grp = FreeCAD.ParamGet("User parameter:" + self.PATH)
+        grp.Clear()
+
+    def test_set_and_get_round_trip(self):
+        call("preferences_set", path=self.PATH, key="Flag", value=True)
+        call("preferences_set", path=self.PATH, key="Count", value=3)
+        call("preferences_set", path=self.PATH, key="Ratio", value=1.5)
+        call("preferences_set", path=self.PATH, key="Name", value="box")
+        call("preferences_set", path=self.PATH, key="Color", value=4294902015, type="unsigned")
+        got = call("preferences_get", path=self.PATH)
+        self.assertEqual(got["path"], "User parameter:" + self.PATH)
+        values = got["values"]
+        self.assertEqual(values["Flag"], {"type": "bool", "value": True})
+        self.assertEqual(values["Count"], {"type": "int", "value": 3})
+        self.assertEqual(values["Ratio"]["type"], "float")
+        self.assertEqual(values["Name"], {"type": "string", "value": "box"})
+        self.assertEqual(values["Color"], {"type": "unsigned", "value": 4294902015})
+        self.assertTrue(FreeCAD.ParamGet("User parameter:" + self.PATH).GetBool("Flag"))
+        removed = call("preferences_set", path=self.PATH, key="Flag", value=None)
+        self.assertNotIn("Flag", removed["values"])
+        units = call("preferences_get", path="BaseApp/Preferences/Units")
+        self.assertIn("values", units)

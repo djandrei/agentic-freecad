@@ -5,6 +5,7 @@ add_subdirectory(App)
 set(Agentic_Scripts
     Init.py
     TestAgenticApp.py
+    agentic_props.py
     tools_reference.py
 )
 

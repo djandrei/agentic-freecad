@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
@@ -16,6 +17,8 @@
 
 namespace Agentic
 {
+
+class DocumentEngine;
 
 /// What a tool can do with an open project.
 ///
@@ -51,6 +54,13 @@ public:
     /// Records a change made by a tool and tells the observers.
     virtual const ChangeEntry& recordChange(ChangeEntry entry) = 0;
     virtual const ChangeLog& changes() const = 0;
+
+    /// Documents, objects and properties of the project.
+    virtual DocumentEngine& documents() = 0;
+    /// Resolves a project-relative path inside the sandbox (see FileStore::resolve).
+    virtual std::filesystem::path resolvePath(const std::string& relative, bool mustExist) const = 0;
+    /// Tells the observers that a document changed.
+    virtual void notifyDocument(const std::string& document, const std::string& event) = 0;
 };
 
 }  // namespace Agentic

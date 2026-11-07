@@ -5,8 +5,10 @@
 #include <Base/Console.h>
 #include <Base/Interpreter.h>
 
+#include "DocumentTools.h"
 #include "EngineSession.h"
 #include "HttpServer.h"
+#include "PreferenceTools.h"
 #include "MessageLog.h"
 #include "Protocol.h"
 #include "Runtime.h"
@@ -31,7 +33,7 @@ Runtime& Runtime::instance()
 Runtime::Runtime()
     : cfg(AgentConfig::fromApplication())
     , messageLog(std::make_unique<MessageLog>())
-    , sessionManager(std::make_unique<SessionManager>(observerList))
+    , sessionManager(std::make_unique<SessionManager>(observerList, *messageLog))
     , proto(std::make_unique<Protocol>())
 {
     Base::Console().attachObserver(messageLog.get());
@@ -40,6 +42,8 @@ Runtime::Runtime()
     registerCoreResources(*proto, *this);
     registerCorePrompts(*proto);
     registerSessionTools(*proto, *this);
+    registerDocumentTools(*proto, *this);
+    registerPreferenceTools(*proto, *this);
 
     proto->setToolHooks(
         [this](const std::string& name, const nlohmann::json&) {

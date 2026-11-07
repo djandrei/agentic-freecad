@@ -7,6 +7,7 @@ image without a visible window. It is meant to run both under a display
 (QT_QPA_PLATFORM=offscreen FreeCAD -t TestAgenticGui).
 """
 
+import json
 import os
 import tempfile
 import unittest
@@ -14,6 +15,22 @@ import unittest
 import FreeCAD
 import FreeCADGui
 import Agentic
+
+
+def call(tool, **arguments):
+    request = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {"name": tool, "arguments": arguments},
+    }
+    response = json.loads(Agentic.handleRequest(json.dumps(request)))
+    if "error" in response:
+        raise AssertionError(f"{tool}: protocol error {response['error']}")
+    result = response["result"]
+    if result["isError"]:
+        raise RuntimeError(result["content"][0]["text"])
+    return result["structuredContent"]
 
 
 class AgenticGuiModuleTest(unittest.TestCase):
@@ -68,3 +85,47 @@ class OffscreenCaptureTest(unittest.TestCase):
             (background.red(), background.green(), background.blue()),
             "the box is not visible at the image center",
         )
+
+
+class ViewPropertyTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        call("project_open", path=os.path.realpath(self.tmp.name))
+        call("document_new", name="AgenticViewTest")
+
+    def tearDown(self):
+        for info in call("document_list")["documents"]:
+            call("document_close", document=info["name"])
+        self.tmp.cleanup()
+
+    def test_view_properties_are_read_and_set(self):
+        created = call("object_create", type="Part::Box", name="B", view={"Transparency": 40})
+        self.assertEqual(created["changed"], ["ViewObject.Transparency"])
+        info = call("object_get", object="B")
+        self.assertIn("view", info)
+        self.assertEqual(info["view"]["Transparency"]["value"], 40)
+        self.assertEqual(info["view"]["Visibility"]["value"], True)
+        self.assertIn("DisplayMode", info["view"])
+        self.assertIn("Flat Lines", info["view"]["DisplayMode"]["enum"])
+
+        changed = call(
+            "object_set",
+            object="B",
+            view={"Visibility": False, "LineWidth": 3, "DisplayMode": "Wireframe"},
+        )
+        self.assertEqual(
+            sorted(changed["changed"]),
+            ["ViewObject.DisplayMode", "ViewObject.LineWidth", "ViewObject.Visibility"],
+        )
+        view = call(
+            "object_get", object="B", properties=["Visibility", "LineWidth", "DisplayMode"]
+        )["view"]
+        self.assertFalse(view["Visibility"]["value"])
+        self.assertEqual(view["LineWidth"]["value"], 3)
+        self.assertEqual(view["DisplayMode"]["value"], "Wireframe")
+        python = [c["python"] for c in call("changes_get")["changes"] if c["kind"] == "property"][
+            -1
+        ]
+        self.assertIn(".ViewObject.Visibility = False", python)
+        with self.assertRaises(RuntimeError):
+            call("object_set", object="B", view={"DisplayMode": "Nope"})

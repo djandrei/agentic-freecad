@@ -2,11 +2,15 @@
 
 #pragma once
 
+#include <memory>
+
 #include "ProjectSession.h"
 #include "SessionObserver.h"
 
 namespace Agentic
 {
+
+class MessageLog;
 
 /// The session of one open project: its folder, its files and its change log.
 ///
@@ -16,7 +20,8 @@ namespace Agentic
 class AgenticExport EngineSession: public ProjectSession
 {
 public:
-    EngineSession(const std::filesystem::path& root, const ObserverList& observers);
+    EngineSession(const std::filesystem::path& root, const ObserverList& observers, MessageLog& messages);
+    ~EngineSession() override;
 
     const Project& project() const override;
     Project& mutableProject();
@@ -42,6 +47,10 @@ public:
     const ChangeEntry& recordChange(ChangeEntry entry) override;
     const ChangeLog& changes() const override;
 
+    DocumentEngine& documents() override;
+    std::filesystem::path resolvePath(const std::string& relative, bool mustExist) const override;
+    void notifyDocument(const std::string& document, const std::string& event) override;
+
     /// The tool whose call is in progress, recorded on every change it makes.
     void setCurrentTool(const std::string& name);
 
@@ -53,6 +62,7 @@ private:
     ChangeLog log;
     const ObserverList& observers;
     std::string currentTool;
+    std::unique_ptr<DocumentEngine> docs;
 };
 
 }  // namespace Agentic

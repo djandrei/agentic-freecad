@@ -5,7 +5,29 @@ Context Protocol (MCP) server drives FreeCAD, and a viewer window shows a
 person what the agent is doing. The design is in `DESIGN.md` at the root of
 the parent workspace; this folder documents what is built.
 
-## Status: stage 2
+## Status: stage 3
+
+Stage 3 added documents, objects, properties and preferences:
+
+- documents of a project: `document_list`, `document_open`, `document_new`,
+  `document_save`, `document_close`, `document_recompute`, `document_undo`,
+  `document_redo`; with `autoSave` a document is written to its `.FCStd`
+  after every mutating call, so the folder is always the truth;
+- objects: `object_list`, `object_get`, `object_set`, `object_create`,
+  `object_delete`, `object_dependencies`; every mutation is one transaction
+  named after the tool, so `document_undo` reverses exactly one call;
+  `autoRecompute` recomputes afterwards and the result carries the objects
+  in error, their status strings and the console messages of the call;
+- properties cross to and from JSON through `agentic_props.py`, the same
+  Python API a script would use: quantities with units, vectors,
+  placements, rotations, links and sub-element links, enumerations with
+  their options, colours, expressions (`{expression: ...}`); view-provider
+  properties (appearance, transparency, line width, display mode,
+  visibility) are read under `view` and set the same way when the GUI
+  layer is present; `object_create` imports the module of an unknown type
+  (`Part::Box` loads `Part`);
+- preferences: `preferences_get` and `preferences_set` over the parameter
+  tree behind the Preferences dialog, typed values, removal with `null`.
 
 Stage 2 added projects, files and the session layer:
 

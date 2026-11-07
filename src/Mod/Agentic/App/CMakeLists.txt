@@ -17,6 +17,10 @@ set(Agentic_SRCS
     AppAgentic.cpp
     ChangeLog.cpp
     ChangeLog.h
+    DocumentEngine.cpp
+    DocumentEngine.h
+    DocumentTools.cpp
+    DocumentTools.h
     EngineSession.cpp
     EngineSession.h
     FileStore.cpp
@@ -26,11 +30,15 @@ set(Agentic_SRCS
     MessageLog.cpp
     MessageLog.h
     PreCompiled.h
+    PreferenceTools.cpp
+    PreferenceTools.h
     Project.cpp
     Project.h
     ProjectSession.h
     Protocol.cpp
     Protocol.h
+    PyBridge.cpp
+    PyBridge.h
     Runtime.cpp
     Runtime.h
     Schema.cpp

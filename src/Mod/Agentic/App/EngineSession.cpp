@@ -2,6 +2,7 @@
 
 #include "PreCompiled.h"
 
+#include "DocumentEngine.h"
 #include "EngineSession.h"
 
 using json = nlohmann::json;
@@ -9,15 +10,39 @@ using json = nlohmann::json;
 namespace Agentic
 {
 
-EngineSession::EngineSession(const std::filesystem::path& root, const ObserverList& observerList)
+EngineSession::EngineSession(
+    const std::filesystem::path& root,
+    const ObserverList& observerList,
+    MessageLog& messages
+)
     : proj(root)
     , store(root)
     , observers(observerList)
+    , docs(std::make_unique<DocumentEngine>(*this, messages))
 {
     proj.load();
     if (!Project::exists(root)) {
         proj.save();
     }
+}
+
+EngineSession::~EngineSession() = default;
+
+DocumentEngine& EngineSession::documents()
+{
+    return *docs;
+}
+
+std::filesystem::path EngineSession::resolvePath(const std::string& relative, bool mustExist) const
+{
+    return store.resolve(relative, mustExist);
+}
+
+void EngineSession::notifyDocument(const std::string& document, const std::string& event)
+{
+    observers.each([this, &document, &event](SessionObserver& o) {
+        o.documentChanged(proj, document, event);
+    });
 }
 
 const Project& EngineSession::project() const
