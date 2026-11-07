@@ -4,6 +4,7 @@
 
 #include "DocumentEngine.h"
 #include "EngineSession.h"
+#include "ScriptEngine.h"
 
 using json = nlohmann::json;
 
@@ -19,6 +20,7 @@ EngineSession::EngineSession(
     , store(root)
     , observers(observerList)
     , docs(std::make_unique<DocumentEngine>(*this, messages))
+    , scriptEngine(std::make_unique<ScriptEngine>(*this, messages))
 {
     proj.load();
     if (!Project::exists(root)) {
@@ -31,6 +33,11 @@ EngineSession::~EngineSession() = default;
 DocumentEngine& EngineSession::documents()
 {
     return *docs;
+}
+
+ScriptEngine& EngineSession::scripts()
+{
+    return *scriptEngine;
 }
 
 std::filesystem::path EngineSession::resolvePath(const std::string& relative, bool mustExist) const

@@ -5,7 +5,23 @@ Context Protocol (MCP) server drives FreeCAD, and a viewer window shows a
 person what the agent is doing. The design is in `DESIGN.md` at the root of
 the parent workspace; this folder documents what is built.
 
-## Status: stage 3
+## Status: stage 4
+
+Stage 4 added Python execution:
+
+- `python_run` runs a code string or a project file inside FreeCAD. The
+  namespace persists per project between runs (`python_reset` forgets it)
+  and has `FreeCAD`/`App`, `FreeCADGui`/`Gui` when present, `Part`, `doc`
+  (the active document) and `project_root` bound;
+- the result carries the value of a trailing expression, stdout and
+  stderr, the exception with its traceback, the objects the run created,
+  changed and deleted (tracked through the application's object signals),
+  the documents saved afterwards (documents a script creates inside the
+  project are adopted), and the console messages;
+- the run is one transaction on the active document: committed on
+  success, rolled back on an exception, and reported when the script
+  closed it itself; `timeoutSeconds` (default 60) stops Python code through
+  a trace hook, which cannot interrupt a recompute running inside C++.
 
 Stage 3 added documents, objects, properties and preferences:
 

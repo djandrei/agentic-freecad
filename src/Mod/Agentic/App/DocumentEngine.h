@@ -80,6 +80,10 @@ public:
     nlohmann::json documentInfo(const App::Document* doc) const;
     nlohmann::json objectSummary(const App::DocumentObject* obj) const;
 
+    /// Saves a document to its file (or the default file in the project) and
+    /// makes it one of the project's documents. Used after python_run.
+    nlohmann::json saveOwned(App::Document* doc);
+
 private:
     struct Call
     {

@@ -358,3 +358,101 @@ class PreferenceToolsTest(unittest.TestCase):
         self.assertNotIn("Flag", removed["values"])
         units = call("preferences_get", path="BaseApp/Preferences/Units")
         self.assertIn("values", units)
+
+
+class PythonRunTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = os.path.realpath(self.tmp.name)
+        call("project_open", path=self.root)
+        call("python_reset")
+        self.doc = call("document_new", name="AgenticRunTest")["name"]
+
+    def tearDown(self):
+        for info in call("document_list")["documents"]:
+            call("document_close", document=info["name"])
+        self.tmp.cleanup()
+
+    def test_value_output_and_namespace(self):
+        run = call("python_run", code="x = 20\nprint('hello')\nx * 2")
+        self.assertTrue(run["ok"])
+        self.assertEqual(run["value"], 40)
+        self.assertEqual(run["stdout"], "hello\n")
+        again = call("python_run", code="x + 1")
+        self.assertEqual(again["value"], 21)
+        self.assertEqual(call("python_run", code="doc.Name")["value"], self.doc)
+        self.assertEqual(call("python_run", code="project_root")["value"], self.root)
+        vec = call("python_run", code="App.Vector(1, 2, 3)")["value"]
+        self.assertEqual(vec, [1.0, 2.0, 3.0])
+        call("python_reset")
+        failed = call("python_run", code="x")
+        self.assertFalse(failed["ok"])
+        self.assertEqual(failed["exception"]["type"], "NameError")
+
+    def test_exception_has_traceback_and_rolls_back(self):
+        call("object_create", type="Part::Box", name="B", properties={"Length": 10})
+        run = call("python_run", code="doc.B.Length = 99\nraise ValueError('boom')")
+        self.assertFalse(run["ok"])
+        self.assertEqual(run["exception"]["type"], "ValueError")
+        self.assertEqual(run["exception"]["message"], "boom")
+        self.assertIn("line 2", run["exception"]["traceback"])
+        self.assertTrue(run["transaction"]["rolledBack"])
+        length = call("object_get", object="B", properties=["Length"])["properties"]["Length"]
+        self.assertAlmostEqual(length["value"]["value"], 10.0)
+
+    def test_objects_are_tracked_and_saved(self):
+        run = call(
+            "python_run",
+            code="b = doc.addObject('Part::Box', 'Made')\nb.Length = 5\ndoc.recompute()\nb.Shape.Volume",
+        )
+        self.assertTrue(run["ok"])
+        self.assertAlmostEqual(run["value"], 500.0)
+        self.assertEqual(run["objects"]["created"], [{"document": self.doc, "object": "Made"}])
+        self.assertTrue(run["transaction"]["committed"])
+        self.assertEqual([s["document"] for s in run["saved"]], [self.doc])
+        self.assertTrue(os.path.exists(os.path.join(self.root, self.doc + ".FCStd")))
+
+        run = call("python_run", code="doc.Made.Width = 7\ndoc.removeObject('Made')")
+        self.assertEqual(run["objects"]["deleted"], [{"document": self.doc, "object": "Made"}])
+        self.assertEqual(run["objects"]["changed"], [])
+        undone = call("document_undo")
+        self.assertEqual(undone["transaction"], "python_run")
+        self.assertEqual([o["name"] for o in call("object_list")["objects"]], ["Made"])
+
+    def test_file_mode_and_messages(self):
+        call(
+            "file_write",
+            path="scripts/make.py",
+            content="import FreeCAD\nFreeCAD.Console.PrintWarning('careful\\n')\nresult = 7\n",
+        )
+        run = call("python_run", file="scripts/make.py")
+        self.assertTrue(run["ok"])
+        self.assertEqual(
+            [m["text"] for m in run["messages"] if m["level"] == "warning"], ["careful"]
+        )
+        self.assertEqual(run["warnings"], 1)
+        self.assertEqual(call("python_run", code="result")["value"], 7)
+        with self.assertRaises(RuntimeError):
+            call("python_run", code="1", file="scripts/make.py")
+        with self.assertRaises(RuntimeError):
+            call("python_run", file="scripts/missing.py")
+        changes = call("changes_get")["changes"]
+        self.assertEqual(changes[-1]["kind"], "python")
+        self.assertIn("scripts/make.py", changes[-2]["summary"])
+
+    def test_timeout_stops_python(self):
+        run = call("python_run", code="while True:\n    pass", timeoutSeconds=0.5)
+        self.assertFalse(run["ok"])
+        self.assertTrue(run["timedOut"])
+        self.assertEqual(run["exception"]["type"], "TimeoutError")
+        self.assertLess(run["duration"], 5.0)
+
+    def test_script_created_document_is_adopted(self):
+        run = call(
+            "python_run",
+            code="d = App.newDocument('FromScript')\nd.addObject('Part::Box', 'X')\nd.recompute()\nd.Name",
+        )
+        self.assertTrue(run["ok"])
+        self.assertIn("FromScript", [s["document"] for s in run["saved"]])
+        self.assertIn("FromScript", [d["name"] for d in call("document_list")["documents"]])
+        self.assertTrue(os.path.exists(os.path.join(self.root, "FromScript.FCStd")))

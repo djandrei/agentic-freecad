@@ -43,6 +43,8 @@ set(Agentic_SRCS
     Runtime.h
     Schema.cpp
     Schema.h
+    ScriptEngine.cpp
+    ScriptEngine.h
     SessionManager.cpp
     SessionManager.h
     SessionObserver.h

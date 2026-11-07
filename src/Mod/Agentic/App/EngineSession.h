@@ -48,6 +48,7 @@ public:
     const ChangeLog& changes() const override;
 
     DocumentEngine& documents() override;
+    ScriptEngine& scripts() override;
     std::filesystem::path resolvePath(const std::string& relative, bool mustExist) const override;
     void notifyDocument(const std::string& document, const std::string& event) override;
 
@@ -63,6 +64,7 @@ private:
     const ObserverList& observers;
     std::string currentTool;
     std::unique_ptr<DocumentEngine> docs;
+    std::unique_ptr<ScriptEngine> scriptEngine;
 };
 
 }  // namespace Agentic

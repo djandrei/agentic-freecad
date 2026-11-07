@@ -12,6 +12,7 @@
 #include "MessageLog.h"
 #include "Protocol.h"
 #include "Runtime.h"
+#include "ScriptEngine.h"
 #include "SessionManager.h"
 #include "SessionTools.h"
 #include "StderrLogger.h"
@@ -44,6 +45,7 @@ Runtime::Runtime()
     registerSessionTools(*proto, *this);
     registerDocumentTools(*proto, *this);
     registerPreferenceTools(*proto, *this);
+    registerScriptTools(*proto, *this);
 
     proto->setToolHooks(
         [this](const std::string& name, const nlohmann::json&) {

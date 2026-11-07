@@ -326,6 +326,20 @@ json DocumentEngine::autoSave(App::Document* doc) const
     return {{"saved", ok}, {"file", relativeFile(doc)}};
 }
 
+json DocumentEngine::saveOwned(App::Document* doc)
+{
+    const std::string name = doc->getName();
+    if (std::find(owned.begin(), owned.end(), name) == owned.end()) {
+        owned.push_back(name);
+    }
+    if (active.empty()) {
+        active = name;
+    }
+    json out = autoSave(doc);
+    out["document"] = name;
+    return out;
+}
+
 json DocumentEngine::saveDocument(const std::string& document, const std::optional<std::string>& as)
 {
     const Call call = begin();

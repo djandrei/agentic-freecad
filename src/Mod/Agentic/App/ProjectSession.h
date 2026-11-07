@@ -19,6 +19,7 @@ namespace Agentic
 {
 
 class DocumentEngine;
+class ScriptEngine;
 
 /// What a tool can do with an open project.
 ///
@@ -57,6 +58,8 @@ public:
 
     /// Documents, objects and properties of the project.
     virtual DocumentEngine& documents() = 0;
+    /// Python execution in the project's namespace.
+    virtual ScriptEngine& scripts() = 0;
     /// Resolves a project-relative path inside the sandbox (see FileStore::resolve).
     virtual std::filesystem::path resolvePath(const std::string& relative, bool mustExist) const = 0;
     /// Tells the observers that a document changed.

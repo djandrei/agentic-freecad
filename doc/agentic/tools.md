@@ -2,7 +2,7 @@
 
 Generated from the server's registry by `src/Mod/Agentic/tools_reference.py`; do not edit by hand.
 
-29 tools, 1 resources, 1 prompts.
+31 tools, 1 resources, 1 prompts.
 
 ## Tools
 
@@ -273,6 +273,26 @@ Change project settings and save them to `.freecad-project.json`.
 | `project` | string | no | Name or folder of an open project to address; defaults to the current project. |
 | `registries` | array of string | no | Addon registry files or URLs. |
 | `scriptsFolder` | string | no | Folder of the agent's Python scripts, relative to the project. |
+
+### `python_reset`
+
+Forget the project's Python namespace (variables from earlier python_run calls).
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `python_run`
+
+Run Python inside FreeCAD: a code string or a project file. The namespace persists per project between runs and has FreeCAD/App, FreeCADGui/Gui (when available), Part, `doc` (the active document) and `project_root` bound. Returns the value of a trailing expression, stdout, stderr, the exception with traceback, the objects created/changed/deleted, the documents saved, and the console messages. The run is one transaction on the active document and is rolled back on an exception. `timeoutSeconds` stops Python code (not a running recompute inside C++).
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `code` | string | no | Python source to run. |
+| `document` | string | no | Document bound to `doc` and holding the transaction; default the active document. |
+| `file` | string | no | Project-relative path of a .py file to run instead of code. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `timeoutSeconds` | number | no | Abort Python execution after this many seconds. Default 60; 0 disables. |
 
 ### `status`
 

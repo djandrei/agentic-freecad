@@ -6,6 +6,7 @@ set(Agentic_Scripts
     Init.py
     TestAgenticApp.py
     agentic_props.py
+    agentic_script.py
     tools_reference.py
 )
 
