@@ -57,6 +57,7 @@ public:
     ScriptEngine& scripts() override;
     std::filesystem::path resolvePath(const std::string& relative, bool mustExist) const override;
     void notifyDocument(const std::string& document, const std::string& event) override;
+    void notifyFileWritten(const std::string& relative) override;
 
     /// The tool whose call is in progress, recorded on every change it makes.
     void setCurrentTool(const std::string& name);

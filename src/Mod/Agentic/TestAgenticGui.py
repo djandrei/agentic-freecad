@@ -268,3 +268,134 @@ class CommandToolsTest(unittest.TestCase):
         self.assertEqual(run["value"], [True, True])
         self.assertEqual([d["text"] for d in run["dialogs"]], ["Proceed?", "Overwrite?"])
         self.assertEqual([d["answer"] for d in run["dialogs"]], ["No", "OK"])
+
+
+class ViewToolsTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.cleanup)
+        self.root = os.path.realpath(self.tmp.name)
+        call("project_open", path=self.root)
+        call("document_new", name="AgenticViewToolsTest")
+        call(
+            "object_create",
+            type="Part::Box",
+            name="Box",
+            properties={"Length": 10, "Width": 20, "Height": 30},
+        )
+        call(
+            "object_create",
+            type="Part::Cylinder",
+            name="Cyl",
+            properties={"Radius": 2, "Height": 40},
+        )
+
+    def cleanup(self):
+        for info in call("document_list")["documents"]:
+            call("document_close", document=info["name"])
+        self.tmp.cleanup()
+
+    def assertDirection(self, actual, expected):
+        for a, e in zip(actual, expected):
+            self.assertAlmostEqual(a, e, places=5)
+
+    def test_camera_set_and_get(self):
+        top = call("camera_set", view="top", fit="all")
+        self.assertDirection(top["viewDirection"], [0, 0, -1])
+        perspective = call("camera_set", type="Perspective")
+        self.assertEqual(perspective["type"], "Perspective")
+        call("camera_set", type="Orthographic", direction=[1, 0, 0])
+        self.assertDirection(call("camera_get")["viewDirection"], [1, 0, 0])
+        saved = call("camera_set", view="isometric", fit=["Cyl"])
+        call("camera_set", view="front")
+        restored = call("camera_set", inventor=saved["inventor"])
+        self.assertDirection(restored["viewDirection"], saved["viewDirection"])
+        with self.assertRaises(AssertionError):  # schema rejects an unknown view name
+            call("camera_set", view="sideways")
+
+    def test_view_options(self):
+        options = call(
+            "view_options",
+            axisCross=True,
+            cornerCross=False,
+            drawStyle="wireframe",
+            background=[0.2, 0.2, 0.2],
+        )
+        self.assertEqual(
+            sorted(options["changed"]), ["axisCross", "background", "cornerCross", "drawStyle"]
+        )
+        self.assertTrue(options["axisCross"])
+        self.assertFalse(options["cornerCross"])
+        call("view_options", axisCross=False, drawStyle="as-is")
+
+    def test_capture_returns_an_image_and_keeps_the_camera(self):
+        from PySide6.QtGui import QImage
+
+        reference = call("camera_set", view="isometric", fit="all")
+        request = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "view_capture",
+                "arguments": {"width": 320, "height": 200, "view": "front"},
+            },
+        }
+        raw = json.loads(Agentic.handleRequest(json.dumps(request)))["result"]
+        self.assertFalse(raw["isError"])
+        self.assertEqual([c["type"] for c in raw["content"]], ["text", "image"])
+        self.assertEqual(raw["content"][1]["mimeType"], "image/png")
+        result = raw["structuredContent"]
+        self.assertEqual((result["width"], result["height"]), (320, 200))
+        self.assertTrue(result["path"].startswith(".agentic/captures/"))
+        image = QImage(os.path.join(self.root, result["path"]))
+        self.assertEqual((image.width(), image.height()), (320, 200))
+        self.assertDirection(result["camera"]["viewDirection"], [0, 1, 0])
+        self.assertDirection(call("camera_get")["viewDirection"], reference["viewDirection"])
+
+        only = call(
+            "view_capture",
+            objects=["Cyl"],
+            path="shots/cyl.png",
+            inline=False,
+            width=200,
+            height=200,
+        )
+        self.assertEqual(only["path"], "shots/cyl.png")
+        self.assertTrue(os.path.exists(os.path.join(self.root, "shots", "cyl.png")))
+        visible = call("object_get", object="Box", properties=["Visibility"])["view"]["Visibility"][
+            "value"
+        ]
+        self.assertTrue(visible)  # hidden only for the capture
+
+    def test_drawing_export(self):
+        template = os.path.join(
+            FreeCAD.getResourceDir(),
+            "Mod",
+            "TechDraw",
+            "Templates",
+            "Default_Template_A4_Landscape.svg",
+        )
+        made = call(
+            "python_run",
+            code=(
+                "import TechDraw\n"
+                "page = doc.addObject('TechDraw::DrawPage', 'Page')\n"
+                "tpl = doc.addObject('TechDraw::DrawSVGTemplate', 'Template')\n"
+                f"tpl.Template = {template!r}\n"
+                "page.Template = tpl\n"
+                "view = doc.addObject('TechDraw::DrawViewPart', 'View')\n"
+                "page.addView(view)\n"
+                "view.Source = [doc.Box]\n"
+                "doc.recompute()\n"
+            ),
+        )
+        self.assertTrue(made["ok"], made.get("exception"))
+        for ext in ("svg", "pdf"):
+            out = call("drawing_export", page="Page", path=f"drawings/page.{ext}")
+            self.assertGreater(out["size"], 0)
+            self.assertTrue(os.path.exists(os.path.join(self.root, "drawings", f"page.{ext}")))
+        with self.assertRaises(RuntimeError):
+            call("drawing_export", page="Box", path="drawings/box.svg")
+        # The drawing view is now the active window; camera tools still find the 3D view.
+        self.assertIn("viewDirection", call("camera_get"))

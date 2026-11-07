@@ -64,6 +64,9 @@ public:
     virtual std::filesystem::path resolvePath(const std::string& relative, bool mustExist) const = 0;
     /// Tells the observers that a document changed.
     virtual void notifyDocument(const std::string& document, const std::string& event) = 0;
+    /// Tells the observers that a tool wrote a file other than through file_write
+    /// (an export, a capture), so file views refresh.
+    virtual void notifyFileWritten(const std::string& relative) = 0;
 };
 
 }  // namespace Agentic

@@ -46,6 +46,20 @@ std::filesystem::path EngineSession::resolvePath(const std::string& relative, bo
     return store.resolve(relative, mustExist);
 }
 
+void EngineSession::notifyFileWritten(const std::string& relative)
+{
+    WriteResult result;
+    result.path = relative;
+    try {
+        ReadResult read = store.read(relative);
+        result.version = read.version;
+    }
+    catch (const std::exception&) {
+        // too large or unreadable: the observers only need the path
+    }
+    observers.each([this, &result](SessionObserver& o) { o.fileWritten(proj, result); });
+}
+
 void EngineSession::notifyDocument(const std::string& document, const std::string& event)
 {
     observers.each([this, &document, &event](SessionObserver& o) {

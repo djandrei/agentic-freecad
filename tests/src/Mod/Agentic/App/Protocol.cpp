@@ -209,3 +209,29 @@ TEST_F(ProtocolTest, promptMissingRequiredArgumentIsInvalidParams)
     ));
     EXPECT_EQ(response["result"]["messages"][0]["content"]["text"], "hello box");
 }
+
+TEST_F(ProtocolTest, imagesBecomeImageContent)
+{
+    Agentic::Protocol protocol;
+    protocol.addTool({
+        "pic",
+        "returns an image",
+        json({{"type", "object"}}),
+        [](const json&) -> json {
+            return {
+                {"width", 2},
+                {"_images", json::array({{{"data", "iVBORw0KGgo="}, {"mimeType", "image/png"}}})}
+            };
+        },
+    });
+    json response = json::parse(protocol.handleLine(
+        R"({"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"pic"}})"
+    ));
+    const json& result = response["result"];
+    ASSERT_EQ(result["content"].size(), 2U);
+    EXPECT_EQ(result["content"][1]["type"], "image");
+    EXPECT_EQ(result["content"][1]["data"], "iVBORw0KGgo=");
+    EXPECT_EQ(result["content"][1]["mimeType"], "image/png");
+    EXPECT_FALSE(result["structuredContent"].contains("_images"));
+    EXPECT_EQ(result["structuredContent"]["width"], 2);
+}

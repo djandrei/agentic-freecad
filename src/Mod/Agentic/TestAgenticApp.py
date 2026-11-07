@@ -456,3 +456,108 @@ class PythonRunTest(unittest.TestCase):
         self.assertIn("FromScript", [s["document"] for s in run["saved"]])
         self.assertIn("FromScript", [d["name"] for d in call("document_list")["documents"]])
         self.assertTrue(os.path.exists(os.path.join(self.root, "FromScript.FCStd")))
+
+
+class ShapeToolsTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.cleanup)
+        self.root = os.path.realpath(self.tmp.name)
+        call("project_open", path=self.root)
+        call("document_new", name="AgenticShapeTest")
+        call(
+            "object_create",
+            type="Part::Box",
+            name="Box",
+            properties={"Length": 10, "Width": 20, "Height": 30},
+        )
+        call(
+            "object_create",
+            type="Part::Cylinder",
+            name="Cyl",
+            properties={"Radius": 2, "Height": 40},
+        )
+        call(
+            "object_create", type="Part::Cut", name="Cut", properties={"Base": "Box", "Tool": "Cyl"}
+        )
+
+    def cleanup(self):
+        for info in call("document_list")["documents"]:
+            call("document_close", document=info["name"])
+        self.tmp.cleanup()
+
+    def test_geometry_info_of_results_and_listed_objects(self):
+        info = call("geometry_info")
+        self.assertEqual([o["object"] for o in info["objects"]], ["Cut"])
+        cut = info["objects"][0]
+        # The cylinder stands on the box's corner: a quarter of it is cut away.
+        expected = 10 * 20 * 30 - 3.141592653589793 * 2 * 2 * 30 / 4
+        self.assertAlmostEqual(cut["volume"], expected, places=3)
+        self.assertEqual(cut["boundBox"]["size"], [10.0, 20.0, 30.0])
+        self.assertEqual(cut["counts"]["solids"], 1)
+        self.assertTrue(cut["valid"])
+        both = call("geometry_info", objects=["Box", "Cyl"])
+        self.assertEqual(len(both["objects"]), 2)
+        self.assertAlmostEqual(both["total"]["volume"], 6000 + 3.141592653589793 * 4 * 40, places=3)
+        self.assertEqual(both["total"]["boundBox"]["max"][2], 40.0)
+        with self.assertRaises(RuntimeError):
+            call("geometry_info", objects=["Missing"])
+
+    def test_geometry_check(self):
+        checked = call("geometry_check")
+        self.assertTrue(checked["ok"])
+        self.assertEqual(checked["objects"][0]["problems"], [])
+
+    def test_shape_elements_find_the_top_face_and_the_hole(self):
+        top = call("shape_elements", object="Cut", types=["Face"], direction=[0, 0, 1])
+        self.assertEqual(len(top["elements"]), 1)
+        face = top["elements"][0]
+        self.assertEqual(face["surface"], "Plane")
+        self.assertEqual(face["normal"], [0.0, 0.0, 1.0])
+        self.assertAlmostEqual(face["centerOfMass"][2], 30.0)
+        facing = call(
+            "shape_elements",
+            object="Cut",
+            types=["Face"],
+            direction=[0, 0, -1],
+            directionMode="facing",
+        )
+        self.assertEqual([e["normal"] for e in facing["elements"]], [[0.0, 0.0, -1.0]])
+        hole = call("shape_elements", object="Cut", surface="Cylinder")
+        self.assertEqual(len(hole["elements"]), 1)
+        self.assertAlmostEqual(hole["elements"][0]["radius"], 2.0)
+        circles = call("shape_elements", object="Cut", types=["Edge"], curve="Circle")
+        self.assertEqual(len(circles["elements"]), 2)
+        near = call(
+            "shape_elements", object="Box", types=["Vertex"], nearPoint=[10, 20, 30], limit=1
+        )
+        self.assertEqual(near["elements"][0]["point"], [10.0, 20.0, 30.0])
+        self.assertEqual(near["matched"], 8)
+        self.assertEqual(
+            call("shape_elements", object="Box")["counts"], {"faces": 6, "edges": 12, "vertexes": 8}
+        )
+
+    def test_export_and_import_round_trip(self):
+        formats = call("file_formats")
+        self.assertIn("step", formats["export"])
+        self.assertIn("stl", formats["export"])
+        for ext in ("step", "brep", "stl"):
+            out = call("export", path=f"out/part.{ext}")
+            self.assertEqual(out["objects"], ["Cut"])
+            self.assertGreater(out["size"], 0)
+            self.assertTrue(os.path.exists(os.path.join(self.root, "out", f"part.{ext}")))
+        self.assertEqual(call("changes_get")["changes"][-1]["kind"], "export")
+        with self.assertRaises(RuntimeError):
+            call("export", path="out/part.nothing")
+        with self.assertRaises(RuntimeError):
+            call("export", path="../escape.step")
+
+        call("document_new", name="AgenticImportTest")
+        imported = call("import", path="out/part.brep")
+        self.assertEqual(len(imported["created"]), 1)
+        info = call("geometry_info", objects=imported["created"])
+        self.assertAlmostEqual(
+            info["objects"][0]["volume"], 10 * 20 * 30 - 3.141592653589793 * 4 * 30 / 4, places=3
+        )
+        with self.assertRaises(RuntimeError):
+            call("import", path="out/missing.step")

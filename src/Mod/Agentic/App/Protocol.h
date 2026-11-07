@@ -21,7 +21,8 @@ namespace Agentic
 /// or an empty result when the request was a notification. Tools, resources
 /// and prompts are registered by name. Tool arguments are validated against
 /// the tool's input schema before the handler runs; a handler returns the
-/// structured result or throws to report a tool error.
+/// structured result or throws to report a tool error. A result may carry
+/// `_images` ([{data: base64, mimeType}]); they are sent as image content.
 class AgenticExport Protocol
 {
 public:

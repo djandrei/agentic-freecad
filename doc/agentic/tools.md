@@ -2,9 +2,33 @@
 
 Generated from the server's registry by `src/Mod/Agentic/tools_reference.py`; do not edit by hand.
 
-43 tools, 1 resources, 1 prompts.
+54 tools, 1 resources, 1 prompts.
 
 ## Tools
+
+### `camera_get`
+
+The 3D view's camera: type, view and up directions, orientation quaternion, the Inventor camera string (to restore it with camera_set), view size, axis cross.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `camera_set`
+
+Set the 3D view's camera: a named orientation, a view direction, an orientation, an Inventor camera string, the camera type, and fit to all, the selection or listed objects. This camera is the reference: captures without their own view use it.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `direction` | array of number | no | View direction (from the camera into the scene). |
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `fit` | string | array | boolean | no | "all" (or true), "selection", or a list of object names to fit. |
+| `inventor` | string | no | A camera as returned by camera_get.inventor. |
+| `orientation` | object | no | {quaternion: [x,y,z,w]} or {axis: [x,y,z], angle: degrees}. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `type` | string ("Orthographic", "Perspective") | no | Camera type. |
+| `view` | string ("isometric", "dimetric", "trimetric", "front", "rear", "top", "bottom", "left", "right") | no | A named orientation. |
 
 ### `changes_get`
 
@@ -115,6 +139,28 @@ Undo the last transaction of a document (one mutating tool call).
 | `document` | string | no | Document name or label; defaults to the project's active document. |
 | `project` | string | no | Name or folder of an open project; defaults to the current project. |
 
+### `drawing_export`
+
+Export a TechDraw page to SVG or PDF in the project folder.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `page` | string | yes | Page object name or label. |
+| `path` | string | yes | Output path ending in .svg or .pdf, relative to the project root. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `export`
+
+Export objects to a file in the project folder; the format follows the extension (step, iges, brep, stl, obj, 3mf, ply, amf, dxf, svg, dae, ifc, gltf, csg, ...). Default objects: the document's result shapes.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `objects` | array of string | no | Object names or labels; default the document's result shapes. |
+| `path` | string | yes | Output path relative to the project root; folders are created. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
 ### `file_delete`
 
 Delete a file or an empty folder of the project.
@@ -123,6 +169,12 @@ Delete a file or an empty folder of the project.
 |---|---|---|---|
 | `path` | string | yes | Path to delete. |
 | `project` | string | no | Name or folder of an open project to address; defaults to the current project. |
+
+### `file_formats`
+
+The file extensions this FreeCAD can import and export (depends on the modules loaded).
+
+No arguments.
 
 ### `file_list`
 
@@ -164,6 +216,37 @@ Write a text file of the project, atomically. Give either `content` (whole file)
 | `edits` | array of object | no | Exact-text edits applied in order. |
 | `path` | string | yes | File path relative to the project root; folders are created. |
 | `project` | string | no | Name or folder of an open project to address; defaults to the current project. |
+
+### `geometry_check`
+
+Check shapes for defects with OpenCASCADE's checker (BRepCheck and, by default, the boolean-operation check): invalid sub-shapes, self-intersections, open shells, inverted solids. Returns per object whether it is ok and the problems found.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `booleanCheck` | boolean | no | Also run the boolean-operation check (slower). Default true. |
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `objects` | array of string | no | Object names or labels; default the document's result shapes. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `geometry_info`
+
+Measured facts about shapes: volume, area, bounding box (min, max, size, center), center of mass, counts of solids, shells, faces, edges and vertices, validity and closedness. Default objects: the results of the document (shapes no other shape consumes); with several, a total volume and combined bounding box.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `objects` | array of string | no | Object names or labels; default the document's result shapes. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `import`
+
+Import a file of the project folder (STEP, IGES, BREP, STL, OBJ, DXF, SVG, IFC, glTF, ...) into a document through FreeCAD's registered importer for its extension.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `path` | string | yes | File path relative to the project root. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
 
 ### `log_get`
 
@@ -340,6 +423,24 @@ Select objects and sub-elements (replacing the selection unless `add`). This is 
 | `add` | boolean | no | Keep the existing selection. Default false. |
 | `items` | array of object | yes | What to select. |
 
+### `shape_elements`
+
+The faces, edges and vertices of an object with their names (Face6, Edge3, Vertex1) and geometry: surface or curve type, area or length, center of mass, bounding box, normal of planar faces, axis, center and radius of cylinders, cones and circles. This replaces clicking in the 3D view: to find the top face, pass direction [0,0,1]; directionMode `extreme` keeps the elements furthest along it, `facing` keeps planar faces whose normal points that way, `sort` only orders. Pass the names to selection_set or to a feature's link property.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `curve` | string | no | Only edges of this curve type: Line, Circle, Ellipse, BSplineCurve, ... |
+| `direction` | array of number | no | Order (and filter, see directionMode) by position along this direction. |
+| `directionMode` | string ("extreme", "facing", "sort") | no | How direction filters. Default extreme. |
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `limit` | integer | no | Maximum number of elements returned. Default 100. |
+| `nearPoint` | array of number | no | Order by distance of the center of mass from this point. |
+| `object` | string | yes | Object name or label. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `surface` | string | no | Only faces of this surface type: Plane, Cylinder, Cone, Sphere, Toroid, BSplineSurface, ... |
+| `tolerance` | number | no | Distance tolerance for directionMode extreme. Default 1e-6. |
+| `types` | array of string ("Face", "Edge", "Vertex") | no | Element kinds; default all. |
+
 ### `status`
 
 Report how this server was started: transport, headless flag, project folder and whether the GUI layer (views, captures) is available.
@@ -377,6 +478,41 @@ Fill fields of the open task panel by id (from task_get). Quantities take a numb
 Report the FreeCAD version and the agentic-freecad server version.
 
 No arguments.
+
+### `view_capture`
+
+Render the 3D view offscreen to a PNG and return it as an image. Uses the session camera unless the capture gives its own view, direction, orientation or camera, which is then restored afterwards (a capture with its own view fits all unless `fit` says otherwise). `objects` shows only those objects in the picture. The image is also written to `path` in the project (default .agentic/captures/).
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `background` | string | no | White, Black, Transparent, Current, or a colour name. Default White. |
+| `direction` | array of number | no | View direction (from the camera into the scene). |
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `fit` | string | array | boolean | no | "all" (or true), "selection", or a list of object names to fit. |
+| `height` | integer | no | Height in pixels. Default 600. |
+| `inline` | boolean | no | Return the image in the response. Default true. |
+| `inventor` | string | no | A camera as returned by camera_get.inventor. |
+| `objects` | array of string | no | Show only these objects. |
+| `orientation` | object | no | {quaternion: [x,y,z,w]} or {axis: [x,y,z], angle: degrees}. |
+| `path` | string | no | Where to keep the PNG, relative to the project root. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `type` | string ("Orthographic", "Perspective") | no | Camera type. |
+| `view` | string ("isometric", "dimetric", "trimetric", "front", "rear", "top", "bottom", "left", "right") | no | A named orientation. |
+| `width` | integer | no | Width in pixels. Default 800. |
+
+### `view_options`
+
+Options of the 3D view: axis cross, corner cross, camera type, background colour, and the draw style (as-is, points, wireframe, hidden-line, no-shading, shaded, flat-lines).
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `axisCross` | boolean | no | Show the axis cross at the origin. |
+| `background` | array of number | no | Background colour [r, g, b] in 0..1. |
+| `cameraType` | string ("Orthographic", "Perspective") | no | Camera type. |
+| `cornerCross` | boolean | no | Show the orientation cross in the corner. |
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `drawStyle` | string ("as-is", "points", "wireframe", "hidden-line", "no-shading", "shaded", "flat-lines") | no | Draw style of the view. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
 
 ### `workbench_activate`
 

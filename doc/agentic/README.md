@@ -5,7 +5,37 @@ Context Protocol (MCP) server drives FreeCAD, and a viewer window shows a
 person what the agent is doing. The design is in `DESIGN.md` at the root of
 the parent workspace; this folder documents what is built.
 
-## Status: stage 5
+## Status: stage 6
+
+Stage 6 added geometry facts, sub-element discovery, import, export, the
+camera, captures and drawings:
+
+- App tools (also in `FreeCADCmd`): `geometry_info` (volume, area,
+  bounding box, center of mass, element counts, validity, closedness; by
+  default for the document's result shapes, the ones no other shape
+  consumes), `geometry_check` (OpenCASCADE's checker with the boolean
+  check), `shape_elements` (faces, edges and vertices with names and
+  geometry, filtered by surface or curve type, by a direction with the
+  modes `extreme`, `facing` and `sort`, or ordered by distance from a
+  point: the agent's replacement for clicking a face), `file_formats`,
+  `import` and `export` through FreeCAD's registered importers and
+  exporters for the extension, preferring the GUI variants that keep
+  colours when the GUI is loaded;
+- GUI tools: `camera_get`, `camera_set` (named orientations, a direction,
+  an orientation, an Inventor camera string, the camera type, fit to all,
+  the selection or listed objects), `view_options` (axis and corner cross,
+  camera type, background, draw style), `view_capture` (offscreen PNG
+  returned as MCP image content and kept in the project; a capture with
+  its own view restores the session camera afterwards; `objects` shows
+  only those), `drawing_export` (TechDraw page to SVG or PDF);
+- tool results can carry images, which the protocol sends as `image`
+  content items.
+
+TechDraw's PDF printer dereferences the page's graphics scene without a
+check, and that scene exists only once the page is shown in its drawing
+view; `drawing_export` opens the page view before printing.
+
+## Stage 5
 
 Stage 5 added GUI commands, task panels, modal dialogs and selection
 (registered only when the GUI layer is loaded, so `FreeCADCmd` lacks them):

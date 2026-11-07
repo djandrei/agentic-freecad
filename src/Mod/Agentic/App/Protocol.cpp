@@ -208,8 +208,22 @@ json Protocol::callTool(const json& id, const json& params) const
         onToolFinish(name, arguments, elapsed(), true);
     }
 
+    // Images travel as MCP image content, not inside the structured result.
+    json images = json::array();
+    if (value.is_object() && value.contains("_images")) {
+        images = value["_images"];
+        value.erase("_images");
+    }
+    json content = json::array({{{"type", "text"}, {"text", value.dump()}}});
+    for (const auto& image : images) {
+        content.push_back({
+            {"type", "image"},
+            {"data", image.value("data", std::string())},
+            {"mimeType", image.value("mimeType", std::string("image/png"))},
+        });
+    }
     json success = {
-        {"content", json::array({{{"type", "text"}, {"text", value.dump()}}})},
+        {"content", content},
         {"structuredContent", value},
         {"isError", false},
     };

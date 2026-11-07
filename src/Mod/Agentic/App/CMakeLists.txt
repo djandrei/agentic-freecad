@@ -51,6 +51,8 @@ set(Agentic_SRCS
     SessionObserver.h
     SessionTools.cpp
     SessionTools.h
+    ShapeTools.cpp
+    ShapeTools.h
     StderrLogger.cpp
     StderrLogger.h
     StdioServer.cpp

@@ -23,6 +23,8 @@ set(AgenticGui_SRCS
     TaskPanelEngine.h
     ViewerShell.cpp
     ViewerShell.h
+    ViewTools.cpp
+    ViewTools.h
 )
 
 add_library(AgenticGui SHARED ${AgenticGui_SRCS})

@@ -12,6 +12,7 @@
 #include "CommandEngine.h"
 #include "DialogGuard.h"
 #include "GuiTools.h"
+#include "ViewTools.h"
 #include "ViewerShell.h"
 
 namespace AgenticGui
@@ -55,6 +56,7 @@ void installAgentMode()
     Agentic::Runtime& runtime = Agentic::Runtime::instance();
     runtime.setGuiAvailable(true);
     Agentic::registerGuiTools(runtime.protocol(), runtime);
+    Agentic::registerViewTools(runtime.protocol(), runtime);
     Agentic::DialogGuard::install();
     if (!runtime.config().enabled) {
         return;

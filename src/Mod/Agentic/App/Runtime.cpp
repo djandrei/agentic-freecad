@@ -15,6 +15,7 @@
 #include "ScriptEngine.h"
 #include "SessionManager.h"
 #include "SessionTools.h"
+#include "ShapeTools.h"
 #include "StderrLogger.h"
 #include "StdioServer.h"
 #include "Tools.h"
@@ -46,6 +47,7 @@ Runtime::Runtime()
     registerDocumentTools(*proto, *this);
     registerPreferenceTools(*proto, *this);
     registerScriptTools(*proto, *this);
+    registerShapeTools(*proto, *this);
 
     proto->setToolHooks(
         [this](const std::string& name, const nlohmann::json&) {

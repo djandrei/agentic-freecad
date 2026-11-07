@@ -7,12 +7,13 @@ set(Agentic_Scripts
     TestAgenticApp.py
     agentic_props.py
     agentic_script.py
+    agentic_shapes.py
     tools_reference.py
 )
 
 if(BUILD_GUI)
     add_subdirectory(Gui)
-    list(APPEND Agentic_Scripts InitGui.py TestAgenticGui.py agentic_gui.py)
+    list(APPEND Agentic_Scripts InitGui.py TestAgenticGui.py agentic_gui.py agentic_view.py)
 endif(BUILD_GUI)
 
 add_custom_target(AgenticScripts ALL
