@@ -36,11 +36,22 @@ public:
 
     QTreeWidget* activityPanel() const;
     QTreeWidget* changesPanel() const;
+    QTreeWidget* modelPanel() const;
+    QTreeWidget* propertiesPanel() const;
+
+    /// Shows an object's properties (a person's inspection, or the agent's
+    /// last touched object).
+    void showObject(const std::string& document, const std::string& object);
 
     nlohmann::json viewerState() const;
 
     // SessionObserver
     void currentProjectChanged(const Project* project) override;
+    void documentChanged(
+        const Project& project,
+        const std::string& document,
+        const std::string& event
+    ) override;
     void changeLogged(const Project& project, const ChangeEntry& entry) override;
     void toolStarted(const std::string& name, const nlohmann::json& arguments) override;
     void toolCalled(
@@ -70,12 +81,21 @@ private:
     };
 
     History& current();
+    void scheduleModel();
+    void rebuildModel();
+    void rebuildProperties();
+    nlohmann::json modelState() const;
     void showActivity(const ActivityRow& row);
     void showChange(const nlohmann::json& change);
     void rebuild();
 
     QTreeWidget* activity {nullptr};
     QTreeWidget* changes {nullptr};
+    QTreeWidget* model {nullptr};
+    QTreeWidget* properties {nullptr};
+    bool modelPending {false};
+    std::string shownDocument;
+    std::string shownObject;
     std::map<std::string, History> histories;  // by project root
     std::string currentRoot;
     static constexpr std::size_t maxRows = 2000;

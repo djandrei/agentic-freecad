@@ -56,6 +56,8 @@ void ViewerShell::apply()
     }
 
     bridge = new ViewerBridge(this);
+    addPanel(bridge->modelPanel(), tr("Model"), "Agentic_Model", Qt::LeftDockWidgetArea);
+    addPanel(bridge->propertiesPanel(), tr("Properties"), "Agentic_Properties", Qt::LeftDockWidgetArea);
     addPanel(bridge->activityPanel(), tr("Activity"), "Agentic_Activity", Qt::BottomDockWidgetArea);
     addPanel(bridge->changesPanel(), tr("Changes"), "Agentic_Changes", Qt::BottomDockWidgetArea);
 

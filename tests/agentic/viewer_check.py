@@ -130,11 +130,71 @@ def stage_v1(tmp):
           kinds)
 
 
+def find_node(nodes, name):
+    for node in nodes:
+        if node.get("name") == name:
+            return node
+        found = find_node(node["children"], name)
+        if found:
+            return found
+    return None
+
+
+def stage_v2(tmp):
+    call("project_open", path=os.path.join(tmp, "tree"), create=True)
+    call("document_new", name="Tree")
+    call("object_create", type="Part::Box", name="Box", properties={"Length": 10})
+    call("object_create", type="Part::Cylinder", name="Cyl", properties={"Radius": 2, "Height": 20})
+    call("object_create", type="Part::Cut", name="Cut")
+    viewer = state()
+    labels = [doc["label"] for doc in viewer["model"]]
+    check("the model shows the project's documents", labels == ["Tree"], labels)
+    cut = find_node(viewer["model"], "Cut")
+    check("an object in error is marked", cut is not None and cut["error"], cut)
+    check("the last touched object is selected", viewer["selected"] == "Cut", viewer["selected"])
+
+    call("object_set", object="Cut", properties={"Base": "Box", "Tool": "Cyl"})
+    viewer = state()
+    cut = find_node(viewer["model"], "Cut")
+    children = sorted(child.get("name") for child in cut["children"]) if cut else None
+    check("inputs are nested under the boolean, as in the classic tree", children == ["Box", "Cyl"], children)
+    check("the fixed object is no longer in error", cut is not None and not cut["error"], cut)
+    top = [node.get("name") for node in viewer["model"][0]["children"]]
+    check("claimed objects are not repeated at the top", top == ["Cut"], top)
+    names = {row["name"] for row in viewer["properties"]["rows"]}
+    check("properties follow the agent's last touched object",
+          viewer["properties"]["object"] == "Cut" and {"Base", "Tool"} <= names, viewer["properties"]["object"])
+    check("view-provider properties are shown in their own group",
+          any(row["group"].startswith("View") for row in viewer["properties"]["rows"]))
+
+    call("object_set", object="Box", properties={"Height": {"expression": "Box.Length / 2"}})
+    rows = {row["name"]: row for row in state()["properties"]["rows"] if not row["group"].startswith("View")}
+    check("a value is shown with its unit", rows.get("Length", {}).get("value") == "10.00 mm", rows.get("Length"))
+    check("an expression is shown next to its value", rows.get("Height", {}).get("expression", "").endswith("Length / 2"),
+          rows.get("Height"))
+
+    from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItemIterator
+
+    tree = FreeCADGui.getMainWindow().findChild(QTreeWidget, "Agentic_ModelPanel")
+    iterator = QTreeWidgetItemIterator(tree)
+    while iterator.value():
+        item = iterator.value()
+        if item.data(0, 0x0100 + 1) == "Cyl":
+            tree.itemClicked.emit(item, 0)
+            break
+        iterator += 1
+    viewer = state()
+    check("clicking an object shows its properties", viewer["properties"]["object"] == "Cyl",
+          viewer["properties"]["object"])
+    check("inspection does not touch the session's selection", call("selection_get")["selection"] == [])
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="agentic-viewer-")
     try:
         stage_v0(os.path.join(tmp, "project"))
         stage_v1(tmp)
+        stage_v2(tmp)
     except Exception:
         log("FAIL exception\n" + traceback.format_exc())
         failures.append("exception")

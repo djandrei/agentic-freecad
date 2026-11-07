@@ -23,6 +23,14 @@ A plain `FreeCAD` launch is the classic GUI, untouched.
 The panels are fed by `ViewerBridge`, a `SessionObserver`: the viewer
 watches the session and never drives it.
 
+- **Model**: the current project's documents (the active one in bold) and
+  their objects, nested as the classic tree nests them (a boolean holds
+  its inputs, a body its features), with their icons; an object in error
+  is red with its status in the tooltip, a touched one italic, a hidden one
+  grey. The object the agent touched last is selected.
+- **Properties**: the properties of the selected object, read-only, by
+  group, values with their units and expressions beside them, the
+  view-provider properties in their own groups.
 - **Activity**: every tool call with the time, the tool, a one-line
   summary of its arguments (file contents and code shown as their
   length), the duration and whether it succeeded.
@@ -31,6 +39,15 @@ watches the session and never drives it.
 
 Activity and changes are kept per project and switch with the current
 project, the one the last tool call addressed.
+
+The model tree and the properties pane are the viewer's own slim widgets.
+The upstream tree and property editor are built for editing (renaming,
+drag and drop, context menus, in-place editors), and a read-only
+configuration of them is not reachable without changing their code.
+
+Clicking an object shows its properties. FreeCAD has one selection, shared
+by the session and every widget, so inspection never touches it: what the
+agent selected stays selected.
 
 `AgenticGui.viewerState()` returns every panel's content as JSON.
 
