@@ -16,6 +16,7 @@
 #include "SessionManager.h"
 #include "SessionTools.h"
 #include "ShapeTools.h"
+#include "SketchTools.h"
 #include "StderrLogger.h"
 #include "StdioServer.h"
 #include "Tools.h"
@@ -48,6 +49,7 @@ Runtime::Runtime()
     registerPreferenceTools(*proto, *this);
     registerScriptTools(*proto, *this);
     registerShapeTools(*proto, *this);
+    registerSketchTools(*proto, *this);
 
     proto->setToolHooks(
         [this](const std::string& name, const nlohmann::json&) {

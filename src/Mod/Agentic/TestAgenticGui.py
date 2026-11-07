@@ -399,3 +399,47 @@ class ViewToolsTest(unittest.TestCase):
             call("drawing_export", page="Box", path="drawings/box.svg")
         # The drawing view is now the active window; camera tools still find the 3D view.
         self.assertIn("viewDirection", call("camera_get"))
+
+
+class EditModeTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.cleanup)
+        call("project_open", path=os.path.realpath(self.tmp.name))
+        call("document_new", name="AgenticEditTest")
+
+    def cleanup(self):
+        call("object_edit_end")
+        if call("task_get")["taskPanel"] is not None:
+            call("task_reject")
+        for info in call("document_list")["documents"]:
+            call("document_close", document=info["name"])
+        self.tmp.cleanup()
+
+    def test_sketch_edit_mode_round_trip(self):
+        call("object_create", type="Sketcher::SketchObject", name="Sketch")
+        call(
+            "sketch_add",
+            sketch="Sketch",
+            geometry=[{"type": "circle", "center": [0, 0], "radius": 3}],
+        )
+        entered = call("object_edit", object="Sketch")
+        self.assertTrue(entered["editing"])
+        self.assertIsNotNone(entered["taskPanel"])
+        # Sketch tools keep working while the sketch is open in the editor.
+        added = call("sketch_add", sketch="Sketch", geometry=[{"type": "point", "at": [1, 1]}])
+        self.assertEqual(added["added"][0]["indices"], [1])
+        left = call("object_edit_end")
+        self.assertEqual(left["object"], "Sketch")
+        self.assertIsNone(left["taskPanel"])
+        again = call("object_edit_end")
+        self.assertFalse(again["editing"])
+        self.assertIsNone(again["object"])
+
+    def test_feature_edit_opens_its_task_panel(self):
+        call("object_create", type="Part::Box", name="Box")
+        entered = call("object_edit", object="Box", mode=1)  # transform
+        self.assertTrue(entered["editing"])
+        call("object_edit_end")
+        with self.assertRaises(RuntimeError):
+            call("object_edit", object="NoSuchObject")

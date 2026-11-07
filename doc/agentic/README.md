@@ -5,7 +5,31 @@ Context Protocol (MCP) server drives FreeCAD, and a viewer window shows a
 person what the agent is doing. The design is in `DESIGN.md` at the root of
 the parent workspace; this folder documents what is built.
 
-## Status: stage 6
+## Status: stage 6b
+
+Stage 6b added edit mode and structured sketching:
+
+- `object_edit` enters an object's edit mode as a double-click in the
+  tree does (a sketch opens in the editor, a feature its task panel, mode
+  1 the transform dialog) and returns the task panel that opened;
+  `object_edit_end` leaves it and recomputes;
+- sketch tools over the Sketcher API, in sketch-plane coordinates (mm,
+  degrees), all in the App layer: `sketch_get` (geometry and constraints
+  with 0-based indices and the solver's diagnosis: solved, degrees of
+  freedom, fully constrained, conflicting, redundant and malformed
+  constraints, open vertices, closed wires), `sketch_add` (line, circle,
+  arc, point, ellipse, B-spline, polyline and rectangle with their
+  implied constraints, construction flag), `sketch_constrain` (every
+  constraint type by element references such as `[3, "start"]`,
+  `"origin"`, `"xAxis"`, with values as numbers or strings with units,
+  names and reference dimensions; Lock as two distances from the origin),
+  `sketch_remove`, `sketch_solve`;
+- each mutating sketch call is one transaction and records its Python.
+
+The Sketcher numbers its conflicting and redundant lists from 1; the tools
+convert them to 0-based indices so they can be passed to `sketch_remove`.
+
+## Stage 6
 
 Stage 6 added geometry facts, sub-element discovery, import, export, the
 camera, captures and drawings:

@@ -2,7 +2,7 @@
 
 Generated from the server's registry by `src/Mod/Agentic/tools_reference.py`; do not edit by hand.
 
-54 tools, 1 resources, 1 prompts.
+61 tools, 1 resources, 1 prompts.
 
 ## Tools
 
@@ -291,6 +291,26 @@ The dependency graph of a document, or of one object with everything it depends 
 | `object` | string | no | Limit to this object's neighbourhood. |
 | `project` | string | no | Name or folder of an open project; defaults to the current project. |
 
+### `object_edit`
+
+Enter an object's edit mode, as a double-click in the tree does: a sketch opens for editing, a feature opens its task panel, a placement its dialog. Returns the task panel that opened (drive it with task_get, task_set, task_accept). `mode` selects an alternative edit mode where the object has one (0 default, 1 transform, ...).
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name; default the project's active document. |
+| `mode` | integer | no | Edit mode. Default 0. |
+| `object` | string | yes | Object name or label. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `object_edit_end`
+
+Leave edit mode (closing the edit task panel as Close would) and recompute.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `document` | string | no | Document name; default the project's active document. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
 ### `object_get`
 
 Everything about one object: type, status, every property with type, group, documentation, value, expression and enumeration options, the view-provider properties under `view` when the GUI is available, dependencies, and a shape summary for geometry.
@@ -440,6 +460,65 @@ The faces, edges and vertices of an object with their names (Face6, Edge3, Verte
 | `surface` | string | no | Only faces of this surface type: Plane, Cylinder, Cone, Sphere, Toroid, BSplineSurface, ... |
 | `tolerance` | number | no | Distance tolerance for directionMode extreme. Default 1e-6. |
 | `types` | array of string ("Face", "Edge", "Vertex") | no | Element kinds; default all. |
+
+### `sketch_add`
+
+Add geometry to a sketch in sketch-plane coordinates (mm, angles in degrees): line {start, end}, circle {center, radius}, arc {center, radius, startAngle, endAngle}, point {at}, ellipse {center, majorRadius, minorRadius, angle}, bspline {poles, degree, periodic}, polyline {points, closed} (with coincident joints), rectangle {corner, width, height} (with coincident, horizontal and vertical constraints). `construction: true` makes construction geometry. Returns the new indices and the solver state.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `details` | boolean | no | Return the full geometry and constraint lists. Default true (false for sketch_solve). |
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `geometry` | array of object | yes | Geometry items, each with a `type`. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `sketch` | string | yes | Sketch object name or label. |
+
+### `sketch_constrain`
+
+Add constraints: Coincident, PointOnObject, Horizontal, Vertical, Parallel, Perpendicular, Tangent, Equal, Symmetric, Block, Lock, Distance, DistanceX, DistanceY, Radius, Diameter, Angle. Each is {type, elements, value?, name?, driving?}; values are numbers (mm, degrees for Angle) or strings with units. Element references: a geometry index (an edge), [index, "start"|"end"|"center"] (a point), "xAxis", "yAxis", "origin", "external:N". Returns the new constraint indices and the solver state, with a warning when constraints conflict.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `constraints` | array of object | yes | Constraints to add. |
+| `details` | boolean | no | Return the full geometry and constraint lists. Default true (false for sketch_solve). |
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `sketch` | string | yes | Sketch object name or label. |
+
+### `sketch_get`
+
+A sketch as data: geometry with indices (type, construction flag, points, radius, angles), constraints with indices (type, element references, value, name, driving), and the solver's diagnosis: solved, degrees of freedom, fully constrained, conflicting, redundant and malformed constraints (0-based indices, like everything else here), open vertices, closed wires, placement.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `details` | boolean | no | Return the full geometry and constraint lists. Default true (false for sketch_solve). |
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `sketch` | string | yes | Sketch object name or label. |
+
+### `sketch_remove`
+
+Remove constraints and geometry by index (0-based, as sketch_get lists them). Removing geometry also removes its constraints and renumbers the rest.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `constraints` | array of integer | no | Constraint indices. |
+| `details` | boolean | no | Return the full geometry and constraint lists. Default true (false for sketch_solve). |
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `geometry` | array of integer | no | Geometry indices. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `sketch` | string | yes | Sketch object name or label. |
+
+### `sketch_solve`
+
+Recompute a sketch and report the solver's diagnosis and the sketch's status.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `details` | boolean | no | Return the full geometry and constraint lists. Default true (false for sketch_solve). |
+| `document` | string | no | Document name or label; defaults to the project's active document. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `sketch` | string | yes | Sketch object name or label. |
 
 ### `status`
 

@@ -8,6 +8,9 @@
 #include <Mod/Agentic/App/PyBridge.h>
 #include <Mod/Agentic/App/Runtime.h>
 #include <Mod/Agentic/App/SessionManager.h>
+#include <Mod/Agentic/App/SessionTools.h>
+
+#include <App/Document.h>
 
 #include "CommandEngine.h"
 #include "GuiTools.h"
@@ -162,6 +165,72 @@ void registerGuiTools(Protocol& protocol, Runtime& runtime)
             runtime.takeDialogs();
             json out = TaskPanelEngine::reject();
             out["dialogs"] = runtime.takeDialogs();
+            return out;
+        },
+    });
+
+    protocol.addTool({
+        "object_edit",
+        "Enter an object's edit mode, as a double-click in the tree does: a sketch opens for "
+        "editing, a feature opens its task panel, a placement its dialog. Returns the task "
+        "panel that opened (drive it with task_get, task_set, task_accept). `mode` selects "
+        "an alternative edit mode where the object has one (0 default, 1 transform, ...).",
+        {{"type", "object"},
+         {"properties",
+          {{"object", prop("string", "Object name or label.")},
+           {"mode", prop("integer", "Edit mode. Default 0.")},
+           {"document", prop("string", "Document name; default the project's active document.")},
+           {"project",
+            prop("string", "Name or folder of an open project; defaults to the current project.")}}},
+         {"required", {"object"}},
+         {"additionalProperties", false}},
+        [&runtime](const json& args) -> json {
+            EngineSession& session = sessionFor(runtime, args);
+            App::Document* doc = session.documents().resolveDocument(
+                args.value("document", std::string())
+            );
+            json forward = args;
+            forward.erase("project");
+            forward["document"] = doc->getName();
+            runtime.takeDialogs();
+            json out = callPython("agentic_sketch", "object_edit", forward);
+            ChangeEntry entry;
+            entry.kind = "edit";
+            entry.summary = "edit mode on " + out["object"].get<std::string>();
+            entry.python = out.value("python", std::string());
+            session.recordChange(std::move(entry));
+            out.erase("python");
+            out["taskPanel"] = TaskPanelEngine::describe();
+            out["dialogs"] = runtime.takeDialogs();
+            return out;
+        },
+    });
+
+    protocol.addTool({
+        "object_edit_end",
+        "Leave edit mode (closing the edit task panel as Close would) and recompute.",
+        {{"type", "object"},
+         {"properties",
+          {{"document", prop("string", "Document name; default the project's active document.")},
+           {"project",
+            prop("string", "Name or folder of an open project; defaults to the current project.")}}},
+         {"additionalProperties", false}},
+        [&runtime](const json& args) -> json {
+            EngineSession& session = sessionFor(runtime, args);
+            App::Document* doc = session.documents().resolveDocument(
+                args.value("document", std::string())
+            );
+            json out = callPython("agentic_sketch", "object_edit_end", {{"document", doc->getName()}});
+            if (out.contains("python")) {
+                ChangeEntry entry;
+                entry.kind = "edit";
+                entry.summary = "left edit mode";
+                entry.python = out["python"].get<std::string>();
+                session.recordChange(std::move(entry));
+                out.erase("python");
+            }
+            out["taskPanel"] = TaskPanelEngine::describe();
+            out["saved"] = session.documents().saveProjectDocuments();
             return out;
         },
     });

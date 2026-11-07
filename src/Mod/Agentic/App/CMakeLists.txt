@@ -53,6 +53,8 @@ set(Agentic_SRCS
     SessionTools.h
     ShapeTools.cpp
     ShapeTools.h
+    SketchTools.cpp
+    SketchTools.h
     StderrLogger.cpp
     StderrLogger.h
     StdioServer.cpp

@@ -8,6 +8,7 @@ set(Agentic_Scripts
     agentic_props.py
     agentic_script.py
     agentic_shapes.py
+    agentic_sketch.py
     tools_reference.py
 )
 

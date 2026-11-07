@@ -561,3 +561,127 @@ class ShapeToolsTest(unittest.TestCase):
         )
         with self.assertRaises(RuntimeError):
             call("import", path="out/missing.step")
+
+
+class SketchToolsTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.cleanup)
+        self.root = os.path.realpath(self.tmp.name)
+        call("project_open", path=self.root)
+        call("document_new", name="AgenticSketchTest")
+        call("object_create", type="Sketcher::SketchObject", name="Sketch")
+
+    def cleanup(self):
+        for info in call("document_list")["documents"]:
+            call("document_close", document=info["name"])
+        self.tmp.cleanup()
+
+    def constrain_plate(self):
+        call(
+            "sketch_add",
+            sketch="Sketch",
+            geometry=[
+                {"type": "rectangle", "corner": [0, 0], "width": 40, "height": 20},
+                {"type": "circle", "center": [20, 10], "radius": 4},
+            ],
+        )
+        return call(
+            "sketch_constrain",
+            sketch="Sketch",
+            constraints=[
+                {"type": "Coincident", "elements": [[0, "start"], "origin"]},
+                {"type": "DistanceX", "elements": [0], "value": 40, "name": "Length"},
+                {"type": "DistanceY", "elements": [1], "value": "20 mm"},
+                {"type": "Radius", "elements": [4], "value": 4},
+                {"type": "DistanceX", "elements": ["origin", [4, "center"]], "value": 20},
+                {"type": "DistanceY", "elements": ["origin", [4, "center"]], "value": 10},
+            ],
+        )
+
+    def test_add_geometry_reports_indices_and_freedom(self):
+        added = call(
+            "sketch_add",
+            sketch="Sketch",
+            geometry=[
+                {"type": "rectangle", "corner": [0, 0], "width": 40, "height": 20},
+                {"type": "circle", "center": [20, 10], "radius": 4},
+                {"type": "line", "start": [0, 0], "end": [40, 20], "construction": True},
+            ],
+        )
+        self.assertEqual([a["indices"] for a in added["added"]], [[0, 1, 2, 3], [4], [5]])
+        self.assertEqual(added["solver"]["degreesOfFreedom"], 11)
+        self.assertTrue(added["geometry"][5]["construction"])
+        self.assertEqual(added["geometry"][4]["radius"], 4.0)
+        self.assertEqual(
+            [c["type"] for c in added["constraints"]],
+            ["Coincident"] * 4 + ["Horizontal", "Horizontal", "Vertical", "Vertical"],
+        )
+        with self.assertRaises(RuntimeError):
+            call("sketch_add", sketch="Sketch", geometry=[{"type": "spiral"}])
+
+    def test_fully_constrained_plate_extrudes(self):
+        constrained = self.constrain_plate()
+        self.assertTrue(constrained["solver"]["fullyConstrained"])
+        self.assertEqual(constrained["created"], [8, 9, 10, 11, 12, 13])
+        named = [c for c in constrained["constraints"] if c.get("name") == "Length"][0]
+        self.assertEqual((named["type"], named["value"]), ("DistanceX", 40.0))
+        self.assertEqual(constrained["closedWires"], 2)
+
+        call(
+            "object_create",
+            type="Part::Extrusion",
+            name="Ext",
+            properties={"Base": "Sketch", "LengthFwd": 5, "Solid": True},
+        )
+        volume = call("geometry_info", objects=["Ext"])["objects"][0]["volume"]
+        self.assertAlmostEqual(volume, 40 * 20 * 5 - 3.141592653589793 * 16 * 5, places=3)
+
+        python = [c["python"] for c in call("changes_get")["changes"] if c["kind"] == "sketch"]
+        self.assertIn("Sketcher.Constraint('DistanceX'", python[1])
+
+    def test_conflict_is_reported_and_removed(self):
+        self.constrain_plate()
+        bad = call(
+            "sketch_constrain",
+            sketch="Sketch",
+            constraints=[{"type": "DistanceX", "elements": [2], "value": -30}],
+        )
+        self.assertIn("warning", bad)
+        self.assertIn(bad["created"][0], bad["solver"]["conflicting"])
+        fixed = call("sketch_remove", sketch="Sketch", constraints=[bad["created"][0]])
+        self.assertTrue(fixed["solver"]["fullyConstrained"])
+        self.assertEqual(len(fixed["constraints"]), 14)
+        undone = call("document_undo")
+        self.assertEqual(undone["transaction"], "sketch_remove Sketch")
+        self.assertFalse(call("sketch_solve", sketch="Sketch")["solver"]["fullyConstrained"])
+
+    def test_remove_geometry_and_angles(self):
+        call(
+            "sketch_add",
+            sketch="Sketch",
+            geometry=[
+                {"type": "line", "start": [0, 0], "end": [10, 0]},
+                {"type": "line", "start": [0, 0], "end": [10, 10]},
+                {"type": "arc", "center": [0, 0], "radius": 5, "startAngle": 0, "endAngle": 90},
+            ],
+        )
+        angled = call(
+            "sketch_constrain",
+            sketch="Sketch",
+            constraints=[
+                {"type": "Coincident", "elements": [[0, "start"], [1, "start"]]},
+                {"type": "Angle", "elements": [0, 1], "value": 30},
+            ],
+        )
+        angle = [c for c in angled["constraints"] if c["type"] == "Angle"][0]
+        self.assertAlmostEqual(angle["value"], 30.0, places=6)
+        arc = angled["geometry"][2]
+        self.assertAlmostEqual(arc["endAngle"], 90.0)
+        removed = call("sketch_remove", sketch="Sketch", geometry=[1])
+        self.assertEqual([g["type"] for g in removed["geometry"]], ["LineSegment", "ArcOfCircle"])
+        self.assertEqual(removed["constraints"], [])
+        with self.assertRaises(RuntimeError):
+            call("sketch_remove", sketch="Sketch", geometry=[9])
+        with self.assertRaises(RuntimeError):
+            call("sketch_get", sketch="NoSketch")
