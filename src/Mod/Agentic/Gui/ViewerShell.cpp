@@ -3,6 +3,9 @@
 #include "PreCompiled.h"
 
 #include <QAction>
+#include <QChildEvent>
+#include <QPointer>
+#include <QStatusBar>
 #include <QMdiArea>
 #include <QMdiSubWindow>
 #include <QPlainTextEdit>
@@ -112,10 +115,12 @@ void ViewerShell::apply()
     connect(viewOnlyAction, &QAction::toggled, this, &ViewerShell::setViewOnly);
     mainWindow->addAction(viewOnlyAction);
     auto viewOnlyButton = new QToolButton(mainWindow);
+    viewOnlyButton->setObjectName(QStringLiteral("Agentic_ViewOnlyButton"));
     viewOnlyButton->setDefaultAction(viewOnlyAction);
     mainWindow->statusBar()->addPermanentWidget(viewOnlyButton);
 
     restoreLayout();
+    claimStatusBar();
     connect(qApp, &QCoreApplication::aboutToQuit, this, [this]() { saveLayout(); });
 
     // Upstream modules (the Start page) act on guiInitialized, which may come
@@ -243,6 +248,67 @@ void ViewerShell::saveLayout() const
                                     : !panel.dock->isHidden();
         params->SetBool((title.toStdString() + "Visible").c_str(), shown);
     }
+}
+
+void ViewerShell::claimStatusBar()
+{
+    // The status bar carries the viewer's controls (Pause agent above all),
+    // so it is shown whatever the classic GUI's StatusBar preference says;
+    // the preference itself is left alone.
+    QStatusBar* bar = mainWindow->statusBar();
+    bar->show();
+    // The bar's context menu toggles the classic items and saves that choice
+    // in the classic GUI's preferences.
+    bar->setContextMenuPolicy(Qt::NoContextMenu);
+    // The classic items (navigation style, view size, notifications, ...) are
+    // controls for a person in the classic window, like the toolbars. The
+    // main window re-lays the bar out when a module adds an item, showing
+    // every item again, so each one is watched and kept hidden.
+    for (QObject* child : bar->children()) {
+        if (auto widget = qobject_cast<QWidget*>(child)) {
+            hideClassicStatusWidget(widget);
+        }
+    }
+    bar->installEventFilter(this);
+}
+
+void ViewerShell::hideClassicStatusWidget(QWidget* widget)
+{
+    if (widget->objectName().startsWith(QStringLiteral("Agentic_")) || widget->isWindow()) {
+        return;
+    }
+    widget->hide();
+    widget->installEventFilter(this);
+}
+
+bool ViewerShell::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == mainWindow->statusBar()) {
+        if (event->type() == QEvent::ChildAdded) {
+            if (auto widget = qobject_cast<QWidget*>(static_cast<QChildEvent*>(event)->child())) {
+                // Queued: the object name is set after the widget is parented.
+                QPointer<QWidget> safe(widget);
+                QTimer::singleShot(0, this, [this, safe]() {
+                    if (safe) {
+                        hideClassicStatusWidget(safe);
+                    }
+                });
+            }
+        }
+        return false;
+    }
+    if (event->type() == QEvent::Show) {
+        auto widget = qobject_cast<QWidget*>(watched);
+        if (widget && !widget->objectName().startsWith(QStringLiteral("Agentic_"))) {
+            QPointer<QWidget> safe(widget);
+            QTimer::singleShot(0, this, [safe]() {
+                if (safe) {
+                    safe->hide();
+                }
+            });
+        }
+    }
+    return false;
 }
 
 void ViewerShell::restoreLayout()

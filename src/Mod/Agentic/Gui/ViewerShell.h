@@ -70,6 +70,10 @@ public:
         const std::string& event
     ) override;
 
+protected:
+    /// Keeps the classic status-bar widgets hidden (see claimStatusBar).
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
 private:
     struct Panel
     {
@@ -83,6 +87,8 @@ private:
     void onContent(const QString& panel, bool alert);
     void showAlert(Panel& panel);
     void restoreLayout();
+    void claimStatusBar();
+    void hideClassicStatusWidget(QWidget* widget);
     void saveLayout() const;
 
     Gui::MainWindow* mainWindow;

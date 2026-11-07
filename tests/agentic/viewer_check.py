@@ -66,8 +66,16 @@ def stage_v0(root):
 
     window = FreeCADGui.getMainWindow()
     check("agent mode is on", Agentic.isAgentMode())
-    from PySide6.QtWidgets import QLabel
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QLabel, QWidget
 
+    bar = window.statusBar()
+    check("the status bar is shown, whatever the classic StatusBar preference says", bar.isVisible())
+    settle()
+    foreign = [w.objectName() or type(w).__name__ for w in bar.findChildren(QWidget)
+               if w.parentWidget() is bar and w.isVisible() and not w.objectName().startswith("Agentic_")]
+    check("only the viewer's own widgets show in the status bar", foreign == [], foreign)
+    check("the status bar has no context menu", bar.contextMenuPolicy() == Qt.NoContextMenu)
     label = window.statusBar().findChild(QLabel, "Agentic_ModeLabel")
     check("status bar says agent mode", label is not None and label.text().startswith("Agent mode"),
           label.text() if label else None)
