@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+name: agentic-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agentic-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      builddir: build/relWithDebInfo
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          locked: true
+          cache: true
+
+      - name: Configure
+        run: pixi run configure
+
+      - name: Build
+        run: pixi run build
+
+      - name: C++ tests (Agentic)
+        run: pixi run ${{ env.builddir }}/tests/Agentic_tests_run
+
+      - name: Python tests (console)
+        run: pixi run ${{ env.builddir }}/bin/FreeCADCmd -t TestAgenticApp
+
+      - name: Python tests (GUI under Xvfb)
+        run: pixi run xvfb-run -a ${{ env.builddir }}/bin/FreeCAD -t TestAgenticGui
+
+      - name: Python tests (GUI, offscreen platform)
+        env:
+          QT_QPA_PLATFORM: offscreen
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: pixi run ${{ env.builddir }}/bin/FreeCAD -t TestAgenticGui
+
+      - name: stdio end-to-end
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: pixi run python3 tests/agentic/stdio_smoke.py ${{ env.builddir }}/bin/FreeCAD

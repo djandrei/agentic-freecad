@@ -51,7 +51,8 @@ ui_*.h
 /build/
 /cmake-build*/
 /conda/environment.yml
-/doc/
+/doc/*
+!/doc/agentic/
 /lib/
 /src/Tools/offlinedoc/*.txt
 /src/Tools/offlinedoc/localwiki/
