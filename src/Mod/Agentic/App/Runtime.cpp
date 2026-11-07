@@ -5,6 +5,7 @@
 #include <Base/Console.h>
 #include <Base/Interpreter.h>
 
+#include "AddonTools.h"
 #include "DocumentTools.h"
 #include "EngineSession.h"
 #include "HttpServer.h"
@@ -50,6 +51,7 @@ Runtime::Runtime()
     registerScriptTools(*proto, *this);
     registerShapeTools(*proto, *this);
     registerSketchTools(*proto, *this);
+    registerAddonTools(*proto, *this);
 
     proto->setToolHooks(
         [this](const std::string& name, const nlohmann::json&) {
@@ -110,7 +112,7 @@ bool Runtime::start()
 
     if (!cfg.project.empty()) {
         try {
-            sessionManager->open(cfg.project, true);
+            loadProjectAddons(sessionManager->open(cfg.project, true));
         }
         catch (const std::exception& e) {
             Base::Console().error("Agentic: cannot open project {}: {}\n", cfg.project, e.what());

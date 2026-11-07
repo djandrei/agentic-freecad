@@ -2,9 +2,80 @@
 
 Generated from the server's registry by `src/Mod/Agentic/tools_reference.py`; do not edit by hand.
 
-61 tools, 1 resources, 1 prompts.
+68 tools, 1 resources, 1 prompts.
 
 ## Tools
+
+### `addon_catalog`
+
+Addons available from the registries (the FreeCAD addon index, the user's and the project's registries): id, repository, branch, archive URL, FreeCAD version range and whether each entry is compatible and already installed. Remote registries are cached for a day; `refresh` fetches them again.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `filter` | string | no | Case-insensitive substring of the id, repository or note. |
+| `limit` | integer | no | Maximum number of addons returned. Default 200. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `refresh` | boolean | no | Fetch remote registries again. Default false. |
+
+### `addon_files`
+
+List the files of an installed addon, or read one (text up to 2 MiB): its README, its macros, its parts library.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | yes | Installed addon id. |
+| `limit` | integer | no | Maximum number of files listed. Default 500. |
+| `path` | string | no | File or folder inside the addon. Default the addon root. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `recursive` | boolean | no | List sub-folders too. Default true. |
+
+### `addon_install`
+
+Install an addon from the catalog into the project's addon folder (its zip archive over TLS, or `git clone` without a shell) and load it into this session: its Init.py runs, and its InitGui.py when the GUI is loaded, so its workbenches appear in workbench_list. Installing runs the addon's code. Python dependencies listed in package.xml are reported, not installed.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `force` | boolean | no | Replace an existing install. Default false. |
+| `id` | string | yes | Addon id as addon_catalog lists it. |
+| `load` | boolean | no | Load it into this session. Default true. |
+| `method` | string ("auto", "zip", "git") | no | Download method. Default auto (zip, then git). |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `ref` | string | no | Branch or tag of a catalog entry; default the first compatible entry. |
+
+### `addon_installed`
+
+Addons installed in the project's addon folder, with their source, package.xml facts (version, dependencies), README file and load report.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `addon_registry_add`
+
+Add a registry (a JSON file in the Addon Manager's catalog format, by URL or by path) to the project's settings or to the user's preferences.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `location` | string | yes | https URL, file URL, or a path (relative paths are relative to the project). |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+| `scope` | string ("project", "user") | no | Where to record it. Default project. |
+
+### `addon_registry_list`
+
+The registries the catalog is built from: the default FreeCAD addon index, the user's and the project's, with whether remote ones are cached.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
+
+### `addon_remove`
+
+Remove an addon from the project's addon folder. Code it already loaded stays registered until FreeCAD restarts.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | yes | Installed addon id. |
+| `project` | string | no | Name or folder of an open project; defaults to the current project. |
 
 ### `camera_get`
 

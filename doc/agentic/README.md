@@ -5,7 +5,34 @@ Context Protocol (MCP) server drives FreeCAD, and a viewer window shows a
 person what the agent is doing. The design is in `DESIGN.md` at the root of
 the parent workspace; this folder documents what is built.
 
-## Status: stage 6b
+## Status: stage 7
+
+Stage 7 added addons:
+
+- the catalog is the Addon Manager's (FreeCAD/Addons `Data/Index.json`:
+  addon id to entries with repository, branch, archive URL and FreeCAD
+  version range), merged with the user's registries (preference
+  `BaseApp/Preferences/Mod/Agentic/Registries`) and the project's
+  (`registries` in `.freecad-project.json`); remote registries are fetched
+  over TLS and cached for a day under `$XDG_CACHE_HOME/agentic-freecad`
+  (or `AGENTIC_FREECAD_CACHE`); `UseDefaultRegistry` turns the FreeCAD
+  index off;
+- `addon_install` downloads the archive over TLS (or runs `git clone`
+  without a shell), extracts it refusing absolute paths, `..` and links,
+  installs into `<project>/<addonFolder>/<id>` with a manifest, and loads
+  it into the session as FreeCAD's startup does (folder on `sys.path`,
+  `Init.py`, and `InitGui.py` when the GUI is loaded, so its workbenches
+  appear); installed addons are loaded again when the project opens;
+  Python dependencies from `package.xml` are reported, not installed;
+- `addon_catalog`, `addon_installed`, `addon_remove`, `addon_files` (list or
+  read an addon's files: README, macros, parts), `addon_registry_list`,
+  `addon_registry_add` (project or user scope).
+
+Installing an addon runs its code: that is what an addon is. Removing one
+deletes its folder, but code it loaded stays registered until FreeCAD
+restarts.
+
+## Stage 6b
 
 Stage 6b added edit mode and structured sketching:
 

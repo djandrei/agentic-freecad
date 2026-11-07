@@ -12,6 +12,8 @@ set(Agentic_LIBS
 )
 
 set(Agentic_SRCS
+    AddonTools.cpp
+    AddonTools.h
     AgentConfig.cpp
     AgentConfig.h
     AppAgentic.cpp

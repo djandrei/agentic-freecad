@@ -685,3 +685,150 @@ class SketchToolsTest(unittest.TestCase):
             call("sketch_remove", sketch="Sketch", geometry=[9])
         with self.assertRaises(RuntimeError):
             call("sketch_get", sketch="NoSketch")
+
+
+def make_addon_registry(folder):
+    """A local registry with two addons as zip archives, one of them unsafe."""
+    import zipfile
+
+    good = os.path.join(folder, "demo.zip")
+    with zipfile.ZipFile(good, "w") as archive:
+        archive.writestr(
+            "DemoAddon-main/Init.py", "import FreeCAD\nFreeCAD.__agentic_demo_loaded__ = True\n"
+        )
+        archive.writestr(
+            "DemoAddon-main/InitGui.py",
+            "class DemoWorkbench(Workbench):\n"
+            "    MenuText = 'Agentic Demo'\n"
+            "    def Initialize(self):\n"
+            "        pass\n"
+            "    def GetClassName(self):\n"
+            "        return 'Gui::PythonWorkbench'\n"
+            "Gui.addWorkbench(DemoWorkbench())\n",
+        )
+        archive.writestr("DemoAddon-main/README.md", "# Demo addon\nA test addon.\n")
+        archive.writestr(
+            "DemoAddon-main/package.xml",
+            '<?xml version="1.0"?><package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">'
+            "<name>Demo</name><version>1.2.3</version><description>demo</description>"
+            "<license>LGPL-2.1</license><python_dependency>numpy</python_dependency></package>",
+        )
+        archive.writestr("DemoAddon-main/parts/bolt.txt", "M3\n")
+    evil = os.path.join(folder, "evil.zip")
+    with zipfile.ZipFile(evil, "w") as archive:
+        archive.writestr("Evil-main/Init.py", "")
+        archive.writestr("Evil-main/../../escaped.txt", "gotcha")
+    registry = os.path.join(folder, "registry.json")
+    with open(registry, "w") as handle:
+        json.dump(
+            {
+                "_meta": {"description": "test registry"},
+                "Demo": [
+                    {
+                        "repository": "https://example.invalid/demo",
+                        "git_ref": "main",
+                        "zip_url": "file://" + good,
+                        "freecad_min": "0.21.0",
+                    }
+                ],
+                "Evil": [
+                    {
+                        "repository": "https://example.invalid/evil",
+                        "git_ref": "main",
+                        "zip_url": "file://" + evil,
+                    }
+                ],
+                "Future": [
+                    {
+                        "repository": "https://example.invalid/f",
+                        "zip_url": "file://" + good,
+                        "freecad_min": "99.0.0",
+                    }
+                ],
+            },
+            handle,
+        )
+    return registry
+
+
+class AddonToolsTest(unittest.TestCase):
+    PREFS = "User parameter:BaseApp/Preferences/Mod/Agentic"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        prefs = FreeCAD.ParamGet(self.PREFS)
+        self.addCleanup(
+            prefs.SetBool, "UseDefaultRegistry", prefs.GetBool("UseDefaultRegistry", True)
+        )
+        self.addCleanup(prefs.SetString, "Registries", prefs.GetString("Registries", ""))
+        prefs.SetBool("UseDefaultRegistry", False)  # stay offline
+        prefs.SetString("Registries", "")
+        self.root = os.path.realpath(os.path.join(self.tmp.name, "project"))
+        call("project_open", path=self.root, create=True)
+        self.registry = make_addon_registry(os.path.realpath(self.tmp.name))
+
+    def test_registry_catalog_install_files_remove(self):
+        call("addon_registry_add", location=self.registry)
+        regs = call("addon_registry_list")["registries"]
+        self.assertEqual([(r["location"], r["scope"]) for r in regs], [(self.registry, "project")])
+        with open(os.path.join(self.root, ".freecad-project.json")) as handle:
+            self.assertEqual(json.load(handle)["registries"], [self.registry])
+
+        catalog = call("addon_catalog")
+        self.assertEqual([a["id"] for a in catalog["addons"]], ["Demo", "Evil", "Future"])
+        future = [a for a in catalog["addons"] if a["id"] == "Future"][0]
+        self.assertFalse(future["entries"][0]["compatible"])
+        self.assertEqual(
+            [a["id"] for a in call("addon_catalog", filter="demo")["addons"]], ["Demo"]
+        )
+
+        installed = call("addon_install", id="Demo")
+        self.assertEqual(installed["method"], "zip")
+        self.assertEqual(installed["path"], "Mod/Demo")
+        self.assertEqual(installed["package"]["version"], "1.2.3")
+        self.assertIn(
+            {"kind": "python_dependency", "name": "numpy"}, installed["package"]["dependencies"]
+        )
+        self.assertEqual(installed["loaded"]["init"], "ok")
+        self.assertTrue(getattr(FreeCAD, "__agentic_demo_loaded__", False))
+        self.assertTrue(os.path.exists(os.path.join(self.root, "Mod", "Demo", "Init.py")))
+        with self.assertRaises(RuntimeError):
+            call("addon_install", id="Demo")  # already installed
+        self.assertEqual(call("addon_install", id="Demo", force=True)["method"], "zip")
+
+        listed = call("addon_installed")["addons"]
+        self.assertEqual([a["id"] for a in listed], ["Demo"])
+        self.assertEqual(listed[0]["readme"], "README.md")
+        self.assertEqual(listed[0]["source"]["method"], "zip")
+        files = call("addon_files", id="Demo")["files"]
+        self.assertIn("parts/bolt.txt", [f["path"] for f in files])
+        readme = call("addon_files", id="Demo", path="README.md")
+        self.assertIn("Demo addon", readme["content"])
+        with self.assertRaises(RuntimeError):
+            call("addon_files", id="Demo", path="../../.freecad-project.json")
+
+        removed = call("addon_remove", id="Demo")
+        self.assertTrue(removed["removed"])
+        self.assertIsNotNone(removed["note"])
+        self.assertEqual(call("addon_installed")["addons"], [])
+        kinds = [c["kind"] for c in call("changes_get")["changes"]]
+        self.assertEqual(kinds.count("addon"), 3)
+
+    def test_unsafe_archive_and_unknown_addon_are_refused(self):
+        call("addon_registry_add", location=self.registry)
+        with self.assertRaises(RuntimeError) as err:
+            call("addon_install", id="Evil", method="zip")
+        self.assertIn("unsafe path", str(err.exception))
+        self.assertFalse(os.path.exists(os.path.join(self.tmp.name, "escaped.txt")))
+        self.assertFalse(os.path.exists(os.path.join(self.root, "Mod", "Evil")))
+        with self.assertRaises(RuntimeError):
+            call("addon_install", id="NotThere")
+        with self.assertRaises(RuntimeError):
+            call("addon_install", id="../escape")
+
+    def test_user_registry_scope(self):
+        call("addon_registry_add", location=self.registry, scope="user")
+        regs = call("addon_registry_list")["registries"]
+        self.assertEqual([(r["location"], r["scope"]) for r in regs], [(self.registry, "user")])
+        self.assertIn("Demo", [a["id"] for a in call("addon_catalog")["addons"]])

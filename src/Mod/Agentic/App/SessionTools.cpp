@@ -2,6 +2,7 @@
 
 #include "PreCompiled.h"
 
+#include "AddonTools.h"
 #include "EngineSession.h"
 #include "MessageLog.h"
 #include "Protocol.h"
@@ -115,8 +116,13 @@ void registerSessionTools(Protocol& protocol, Runtime& runtime)
          {"additionalProperties", false}},
         [&runtime](const json& args) -> json {
             const bool create = args.value("create", false);
+            const std::size_t before = runtime.sessions().list().size();
             EngineSession& session = runtime.sessions().open(args["path"].get<std::string>(), create);
-            return session.info();
+            json info = session.info();
+            if (runtime.sessions().list().size() > before) {
+                info["addons"] = loadProjectAddons(session)["loaded"];
+            }
+            return info;
         },
     });
 

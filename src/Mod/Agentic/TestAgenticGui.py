@@ -443,3 +443,31 @@ class EditModeTest(unittest.TestCase):
         call("object_edit_end")
         with self.assertRaises(RuntimeError):
             call("object_edit", object="NoSuchObject")
+
+
+class AddonWorkbenchTest(unittest.TestCase):
+    PREFS = "User parameter:BaseApp/Preferences/Mod/Agentic"
+
+    def setUp(self):
+        from TestAgenticApp import make_addon_registry
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        prefs = FreeCAD.ParamGet(self.PREFS)
+        self.addCleanup(
+            prefs.SetBool, "UseDefaultRegistry", prefs.GetBool("UseDefaultRegistry", True)
+        )
+        prefs.SetBool("UseDefaultRegistry", False)
+        self.root = os.path.realpath(os.path.join(self.tmp.name, "project"))
+        call("project_open", path=self.root, create=True)
+        call("addon_registry_add", location=make_addon_registry(os.path.realpath(self.tmp.name)))
+
+    def test_installed_workbench_appears(self):
+        installed = call("addon_install", id="Demo", force=True)
+        self.assertIn(installed["loaded"]["initGui"], ("ok", None))
+        names = [w["name"] for w in call("workbench_list")["workbenches"]]
+        self.assertIn("DemoWorkbench", names)
+        self.assertEqual(
+            call("workbench_activate", name="DemoWorkbench")["workbench"], "DemoWorkbench"
+        )
+        call("workbench_activate", name="PartWorkbench")
