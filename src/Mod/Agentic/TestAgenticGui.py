@@ -40,7 +40,7 @@ class AgenticGuiModuleTest(unittest.TestCase):
     def test_test_run_keeps_classic_window(self):
         # Without --agent the viewer shell must not touch the main window.
         self.assertFalse(Agentic.isAgentMode())
-        self.assertNotEqual(FreeCADGui.getMainWindow().windowTitle(), "FreeCAD (agent mode)")
+        self.assertFalse(FreeCADGui.getMainWindow().menuBar().isHidden())
 
 
 class OffscreenCaptureTest(unittest.TestCase):
@@ -270,6 +270,10 @@ class CommandToolsTest(unittest.TestCase):
         self.assertEqual([d["answer"] for d in run["dialogs"]], ["No", "OK"])
 
 
+def _vec(v):
+    return [v.x, v.y, v.z]
+
+
 class ViewToolsTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -312,6 +316,17 @@ class ViewToolsTest(unittest.TestCase):
         self.assertDirection(restored["viewDirection"], saved["viewDirection"])
         with self.assertRaises(AssertionError):  # schema rejects an unknown view name
             call("camera_set", view="sideways")
+
+    def test_capture_uses_the_agent_camera_not_the_person_view(self):
+        agent = call("camera_set", view="isometric", fit="all")
+        person = FreeCADGui.getDocument("AgenticViewToolsTest").ActiveView
+        person.viewTop()  # a person orbits the viewer
+        FreeCADGui.updateGui()
+        shot = call("view_capture", width=120, height=90, inline=False)
+        self.assertDirection(shot["camera"]["viewDirection"], agent["viewDirection"])
+        self.assertDirection(
+            _vec(person.getViewDirection()), [0, 0, -1]
+        )  # left as the person had it
 
     def test_view_options(self):
         options = call(

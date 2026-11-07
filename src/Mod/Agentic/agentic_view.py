@@ -16,6 +16,10 @@ import os
 import FreeCAD
 import FreeCADGui as Gui
 
+# The agent's camera per document: the reference a capture without its own
+# view renders from, whatever a person watching has orbited to since.
+_agent_camera = {}
+
 NAMED_VIEWS = {
     "isometric": "viewIsometric",
     "dimetric": "viewDimetric",
@@ -127,10 +131,15 @@ def camera_get(payload):
     return json.dumps(_camera_state(_view(args["document"])))
 
 
+def _record_agent_camera(document, view):
+    _agent_camera[document] = (view.getCameraType(), view.getCamera())
+
+
 def camera_set(payload):
     args = json.loads(payload)
     view = _view(args["document"])
     _apply_camera(view, args["document"], args)
+    _record_agent_camera(args["document"], view)
     return json.dumps(_camera_state(view))
 
 
@@ -146,6 +155,7 @@ def view_options(payload):
         changed.append("cornerCross")
     if "cameraType" in args:
         view.setCameraType(args["cameraType"])
+        _record_agent_camera(args["document"], view)
         changed.append("cameraType")
     if "background" in args:
         r, g, b = args["background"]
@@ -192,6 +202,10 @@ def capture(payload):
         saved_camera = (view.getCameraType(), view.getCamera())
         if "fit" not in camera_args:
             camera_args["fit"] = "all"
+    elif document in _agent_camera:
+        # Render from the agent's camera, not from wherever a person orbited.
+        saved_camera = (view.getCameraType(), view.getCamera())
+        camera_args = {"type": _agent_camera[document][0], "inventor": _agent_camera[document][1]}
 
     only = args.get("objects") or []
     hidden = []

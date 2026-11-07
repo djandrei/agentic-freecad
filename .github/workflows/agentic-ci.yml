@@ -67,6 +67,11 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: pixi run python3 tests/agentic/http_smoke.py ${{ env.builddir }}/bin/FreeCAD
 
+      - name: Viewer end-to-end (agent mode under Xvfb)
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: pixi run xvfb-run -a ${{ env.builddir }}/bin/FreeCAD --agent --agent-port 0 tests/agentic/viewer_check.py
+
       - name: Tool reference is up to date
         env:
           QT_QPA_PLATFORM: offscreen
