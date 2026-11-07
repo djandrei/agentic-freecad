@@ -189,12 +189,61 @@ def stage_v2(tmp):
     check("inspection does not touch the session's selection", call("selection_get")["selection"] == [])
 
 
+def stage_v3(tmp):
+    viewer = state()
+    check("the status bar shows the server URL", viewer["status"]["server"].startswith("http://127.0.0.1:"),
+          viewer["status"]["server"])
+    check("the status bar shows the project", viewer["status"]["project"] == "Project: tree",
+          viewer["status"]["project"])
+    call("object_create", type="Part::Cut", name="Broken")
+    viewer = state()
+    check("the status bar shows objects in error", "1 object(s) in error" in viewer["status"]["document"],
+          viewer["status"]["document"])
+    call("object_delete", object="Broken")
+    check("the status bar clears when the error is gone", state()["status"]["document"].endswith("- ok"),
+          state()["status"]["document"])
+
+    call("python_run", code="import FreeCAD\nFreeCAD.Console.PrintWarning('look out\\n')\nFreeCAD.Console.PrintError('bad thing\\n')\n")
+    viewer = state()
+    levels = [(m["level"], m["text"]) for m in viewer["messages"]]
+    check("messages show the last call's warnings and errors",
+          ("warning", "look out") in levels and ("error", "bad thing") in levels, levels)
+    check("the code pane shows the Python the agent ran", "look out" in viewer["code"]["text"],
+          viewer["code"]["title"])
+    call("version")
+    check("messages are per call", state()["messages"] == [], state()["messages"])
+
+    call("file_write", path="make.py", content="a = 1\nb = 2\nc = 3\n")
+    call("file_write", path="make.py", edits=[{"oldText": "b = 2", "newText": "b = 20\nb2 = 21"}])
+    viewer = state()
+    check("the code pane shows the file the agent wrote", viewer["code"]["title"] == "make.py", viewer["code"]["title"])
+    check("changed lines are highlighted", viewer["code"]["highlighted"] == [2, 3], viewer["code"]["highlighted"])
+
+    from PySide6.QtWidgets import QToolButton
+
+    pause = FreeCADGui.getMainWindow().findChild(QToolButton, "Agentic_Pause")
+    pause.setChecked(True)
+    check("pause is shown in the state", state()["paused"])
+    try:
+        call("object_create", type="Part::Box", name="WhilePaused")
+        refused = False
+    except RuntimeError as err:
+        refused = "paused the agent" in str(err)
+    check("while paused every tool call fails, saying why", refused)
+    pause.setChecked(False)
+    created = call("object_create", type="Part::Box", name="AfterPause")
+    check("after resuming calls work again", created["object"] == "AfterPause", created["object"])
+    check("nothing was created while paused",
+          "WhilePaused" not in [o["name"] for o in call("object_list")["objects"]])
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="agentic-viewer-")
     try:
         stage_v0(os.path.join(tmp, "project"))
         stage_v1(tmp)
         stage_v2(tmp)
+        stage_v3(tmp)
     except Exception:
         log("FAIL exception\n" + traceback.format_exc())
         failures.append("exception")

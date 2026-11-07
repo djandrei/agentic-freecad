@@ -87,6 +87,9 @@ void installAgentMode()
     QTimer::singleShot(0, shell, [shell, &runtime] {
         shell->apply();
         runtime.start();
+        if (Agentic::ViewerBridge* bridge = Agentic::ViewerBridge::instance()) {
+            bridge->updateStatus();  // the server URL is known now
+        }
     });
 }
 

@@ -93,6 +93,11 @@ public:
     /// Called before a tool handler runs and after it returned or threw.
     void setToolHooks(ToolStartHook start, ToolFinishHook finish);
 
+    /// Checked before every tool call: a non-empty message refuses the call
+    /// with that message as a tool error (the person watching paused the agent).
+    using ToolGate = std::function<std::string(const std::string& name)>;
+    void setToolGate(ToolGate gate);
+
     /// Handles one line of input. Returns the serialized response, or an empty
     /// string when no response is due (notification).
     std::string handleLine(const std::string& line);
@@ -123,6 +128,7 @@ private:
     std::string instructions;
     ToolStartHook onToolStart;
     ToolFinishHook onToolFinish;
+    ToolGate gate;
 };
 
 }  // namespace Agentic

@@ -61,6 +61,11 @@ public:
     /// The tool whose call is running on the main thread, or empty.
     const std::string& currentTool() const;
 
+    /// The person watching can pause the agent: every tool call then fails
+    /// with a message saying so, until resumed.
+    void setPaused(bool paused);
+    bool isPaused() const;
+
     /// Modal dialogs auto-answered while a tool ran (filled by the GUI part).
     void noteDialog(nlohmann::json dialog);
     nlohmann::json takeDialogs();
@@ -79,6 +84,7 @@ private:
     std::unique_ptr<StderrLogger> logger;
     bool gui {false};
     std::string runningTool;
+    bool paused {false};
     nlohmann::json dialogs = nlohmann::json::array();
 };
 

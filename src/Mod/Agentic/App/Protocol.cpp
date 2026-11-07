@@ -65,6 +65,11 @@ void Protocol::setInstructions(std::string text)
     instructions = std::move(text);
 }
 
+void Protocol::setToolGate(ToolGate newGate)
+{
+    gate = std::move(newGate);
+}
+
 void Protocol::setToolHooks(ToolStartHook start, ToolFinishHook finish)
 {
     onToolStart = std::move(start);
@@ -179,6 +184,17 @@ json Protocol::callTool(const json& id, const json& params) const
     auto it = tools.find(name);
     if (it == tools.end()) {
         return error(id, invalidParams, "Unknown tool: " + name);
+    }
+
+    if (gate) {
+        const std::string refusal = gate(name);
+        if (!refusal.empty()) {
+            json refused = {
+                {"content", json::array({{{"type", "text"}, {"text", refusal}}})},
+                {"isError", true},
+            };
+            return result(id, refused);
+        }
     }
 
     const json arguments = params.contains("arguments") ? params["arguments"] : json::object();

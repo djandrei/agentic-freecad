@@ -269,3 +269,31 @@ TEST_F(ProtocolTest, resourceTemplatesAreListedAndRead)
     ));
     EXPECT_EQ(bare["error"]["code"], -32002);
 }
+
+TEST_F(ProtocolTest, gateRefusesCallsWithItsMessage)
+{
+    Agentic::Protocol protocol;
+    bool called = false;
+    protocol.addTool({
+        "work",
+        "does work",
+        json({{"type", "object"}}),
+        [&called](const json&) -> json {
+            called = true;
+            return json::object();
+        },
+    });
+    bool closed = true;
+    protocol.setToolGate([&closed](const std::string&) -> std::string {
+        return closed ? "paused" : "";
+    });
+    const char* request = R"({"jsonrpc":"2.0","id":25,"method":"tools/call","params":{"name":"work"}})";
+    json refused = json::parse(protocol.handleLine(request));
+    EXPECT_TRUE(refused["result"]["isError"].get<bool>());
+    EXPECT_EQ(refused["result"]["content"][0]["text"], "paused");
+    EXPECT_FALSE(called);
+    closed = false;
+    json accepted = json::parse(protocol.handleLine(request));
+    EXPECT_FALSE(accepted["result"]["isError"].get<bool>());
+    EXPECT_TRUE(called);
+}

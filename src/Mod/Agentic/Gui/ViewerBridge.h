@@ -13,6 +13,9 @@
 #include <Mod/Agentic/AgenticGlobal.h>
 #include <Mod/Agentic/App/SessionObserver.h>
 
+class QLabel;
+class QPlainTextEdit;
+class QToolButton;
 class QTreeWidget;
 
 namespace Agentic
@@ -38,6 +41,13 @@ public:
     QTreeWidget* changesPanel() const;
     QTreeWidget* modelPanel() const;
     QTreeWidget* propertiesPanel() const;
+    QTreeWidget* messagesPanel() const;
+    QPlainTextEdit* codePanel() const;
+
+    /// Status-bar widgets, left to right: Pause, project, document, server.
+    std::vector<QWidget*> statusWidgets() const;
+    /// Refreshes the status-bar texts (project, document state, server URL).
+    void updateStatus();
 
     /// Shows an object's properties (a person's inspection, or the agent's
     /// last touched object).
@@ -47,6 +57,7 @@ public:
 
     // SessionObserver
     void currentProjectChanged(const Project* project) override;
+    void fileWritten(const Project& project, const WriteResult& result) override;
     void documentChanged(
         const Project& project,
         const std::string& document,
@@ -85,6 +96,7 @@ private:
     void rebuildModel();
     void rebuildProperties();
     nlohmann::json modelState() const;
+    void showCode(const std::string& title, const std::string& text, int firstLine, int lineCount);
     void showActivity(const ActivityRow& row);
     void showChange(const nlohmann::json& change);
     void rebuild();
@@ -93,6 +105,14 @@ private:
     QTreeWidget* changes {nullptr};
     QTreeWidget* model {nullptr};
     QTreeWidget* properties {nullptr};
+    QTreeWidget* messages {nullptr};
+    QPlainTextEdit* code {nullptr};
+    QToolButton* pause {nullptr};
+    QLabel* projectLabel {nullptr};
+    QLabel* documentLabel {nullptr};
+    QLabel* serverLabel {nullptr};
+    std::string codeTitle;
+    std::uint64_t callMessagesFrom {0};
     bool modelPending {false};
     std::string shownDocument;
     std::string shownObject;

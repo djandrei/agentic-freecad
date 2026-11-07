@@ -2,8 +2,14 @@
 
 #include "PreCompiled.h"
 
+#include <fstream>
+#include <sstream>
+
 #include <QDateTime>
 #include <QHeaderView>
+#include <QPlainTextEdit>
+#include <QTextBlock>
+#include <QToolButton>
 #include <QTreeWidget>
 
 #include <functional>
@@ -13,11 +19,14 @@
 #include <App/Document.h>
 #include <App/DocumentObject.h>
 #include <Gui/Application.h>
+#include <Gui/PythonEditor.h>
 #include <Gui/ViewProviderDocumentObject.h>
 
 #include <Mod/Agentic/App/ChangeLog.h>
 #include <Mod/Agentic/App/DocumentEngine.h>
 #include <Mod/Agentic/App/EngineSession.h>
+#include <Mod/Agentic/App/FileStore.h>
+#include <Mod/Agentic/App/MessageLog.h>
 #include <Mod/Agentic/App/Project.h>
 #include <Mod/Agentic/App/PyBridge.h>
 #include <Mod/Agentic/App/Runtime.h>
@@ -86,6 +95,37 @@ ViewerBridge::ViewerBridge(QObject* parent)
     properties->setSelectionMode(QAbstractItemView::NoSelection);
     properties->header()->setStretchLastSection(true);
 
+    messages = makeTable({tr("Level"), tr("Message")}, "Agentic_MessagesPanel");
+
+    code = new QPlainTextEdit();
+    code->setObjectName(QStringLiteral("Agentic_CodePanel"));
+    code->setReadOnly(true);
+    code->setLineWrapMode(QPlainTextEdit::NoWrap);
+    QFont mono(QStringLiteral("monospace"));
+    mono.setStyleHint(QFont::TypeWriter);
+    code->setFont(mono);
+    // Qt attaches a highlighter by itself only to a QTextEdit parent.
+    auto highlighter = new Gui::PythonSyntaxHighlighter(code);
+    highlighter->setDocument(code->document());
+
+    pause = new QToolButton();
+    pause->setObjectName(QStringLiteral("Agentic_Pause"));
+    pause->setText(tr("Pause agent"));
+    pause->setCheckable(true);
+    pause->setToolTip(tr("While paused every tool call fails, telling the agent a person paused it"));
+    connect(pause, &QToolButton::toggled, this, [this](bool on) {
+        Runtime::instance().setPaused(on);
+        pause->setText(on ? tr("Resume agent") : tr("Pause agent"));
+    });
+    projectLabel = new QLabel();
+    projectLabel->setObjectName(QStringLiteral("Agentic_ProjectLabel"));
+    documentLabel = new QLabel();
+    documentLabel->setObjectName(QStringLiteral("Agentic_DocumentLabel"));
+    serverLabel = new QLabel();
+    serverLabel->setObjectName(QStringLiteral("Agentic_ServerLabel"));
+    serverLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    updateStatus();
+
     bridgeInstance = this;
     Runtime::instance().observers().add(this);
 }
@@ -123,6 +163,94 @@ QTreeWidget* ViewerBridge::propertiesPanel() const
     return properties;
 }
 
+QTreeWidget* ViewerBridge::messagesPanel() const
+{
+    return messages;
+}
+
+QPlainTextEdit* ViewerBridge::codePanel() const
+{
+    return code;
+}
+
+std::vector<QWidget*> ViewerBridge::statusWidgets() const
+{
+    return {pause, projectLabel, documentLabel, serverLabel};
+}
+
+void ViewerBridge::updateStatus()
+{
+    Runtime& runtime = Runtime::instance();
+    EngineSession* session = runtime.sessions().current();
+    projectLabel->setText(
+        session ? tr("Project: %1").arg(QString::fromStdString(session->project().settings().name))
+                : tr("No project")
+    );
+    QString docText;
+    if (session) {
+        const std::string active = session->documents().activeDocument();
+        if (App::Document* doc = active.empty() ? nullptr
+                                                : App::GetApplication().getDocument(active.c_str())) {
+            int errors = 0;
+            for (const App::DocumentObject* obj : doc->getObjects()) {
+                errors += obj->isError() ? 1 : 0;
+            }
+            docText = errors ? tr("%1 - %n object(s) in error", nullptr, errors)
+                                   .arg(QString::fromUtf8(doc->Label.getValue()))
+                             : tr("%1 - ok").arg(QString::fromUtf8(doc->Label.getValue()));
+            documentLabel->setStyleSheet(errors ? QStringLiteral("color: red;") : QString());
+        }
+    }
+    documentLabel->setText(docText);
+    const std::string url = runtime.httpUrl();
+    serverLabel->setText(
+        url.empty() ? (runtime.config().stdio ? tr("stdio") : QString()) : QString::fromStdString(url)
+    );
+}
+
+void ViewerBridge::showCode(const std::string& title, const std::string& text, int firstLine, int lineCount)
+{
+    codeTitle = title;
+    code->setPlainText(QString::fromStdString(text));
+    QList<QTextEdit::ExtraSelection> marks;
+    if (firstLine > 0 && lineCount > 0) {
+        QTextCharFormat format;
+        format.setBackground(QColor(255, 244, 179));
+        format.setProperty(QTextFormat::FullWidthSelection, true);
+        for (int line = firstLine; line < firstLine + lineCount; ++line) {
+            QTextBlock block = code->document()->findBlockByNumber(line - 1);
+            if (!block.isValid()) {
+                break;
+            }
+            QTextEdit::ExtraSelection mark;
+            mark.cursor = QTextCursor(block);
+            mark.format = format;
+            marks.append(mark);
+        }
+        if (!marks.isEmpty()) {
+            code->setTextCursor(marks.first().cursor);
+            code->centerCursor();
+        }
+    }
+    code->setExtraSelections(marks);
+}
+
+void ViewerBridge::fileWritten(const Project& project, const WriteResult& result)
+{
+    if (project.root().string() != currentRoot) {
+        return;
+    }
+    const std::string& path = result.path;
+    const bool isPython = path.ends_with(".py") || path.ends_with(".FCMacro");
+    if (!isPython) {
+        return;
+    }
+    std::ifstream in(project.root() / path, std::ios::binary);
+    std::ostringstream text;
+    text << in.rdbuf();
+    showCode(path, text.str(), result.startLine, result.linesAdded);
+}
+
 void ViewerBridge::scheduleModel()
 {
     if (modelPending) {
@@ -134,6 +262,7 @@ void ViewerBridge::scheduleModel()
         modelPending = false;
         rebuildModel();
         rebuildProperties();
+        updateStatus();
     });
 }
 
@@ -461,6 +590,7 @@ void ViewerBridge::currentProjectChanged(const Project* project)
     shownObject.clear();
     rebuild();
     scheduleModel();
+    updateStatus();
 }
 
 void ViewerBridge::documentChanged(
@@ -483,6 +613,10 @@ void ViewerBridge::changeLogged(const Project& project, const ChangeEntry& entry
         return;
     }
     showChange(history.changes.back());
+    if (entry.kind == "python" && !entry.python.empty()
+        && !entry.detail.value("file", json()).is_string()) {
+        showCode("python_run", entry.python, 0, 0);
+    }
     // The object the agent touched last becomes the one shown.
     const json& detail = entry.detail;
     std::string document;
@@ -514,7 +648,9 @@ void ViewerBridge::changeLogged(const Project& project, const ChangeEntry& entry
 }
 
 void ViewerBridge::toolStarted(const std::string& /*name*/, const json& /*arguments*/)
-{}
+{
+    callMessagesFrom = Runtime::instance().messages().nextSeq();
+}
 
 void ViewerBridge::toolCalled(const std::string& name, const json& arguments, double milliseconds, bool ok)
 {
@@ -532,6 +668,25 @@ void ViewerBridge::toolCalled(const std::string& name, const json& arguments, do
         history.activity.erase(history.activity.begin());
     }
     showActivity(row);
+
+    // The messages of this call (log lines are left to log_get).
+    messages->clear();
+    for (const auto& entry : Runtime::instance().messages().since(callMessagesFrom)) {
+        if (entry.level == "log") {
+            continue;
+        }
+        auto item = new QTreeWidgetItem(
+            {QString::fromStdString(entry.level), QString::fromStdString(entry.text)}
+        );
+        if (entry.level == "error" || entry.level == "critical") {
+            item->setForeground(0, QBrush(Qt::red));
+        }
+        else if (entry.level == "warning") {
+            item->setForeground(0, QBrush(QColor(200, 120, 0)));
+        }
+        messages->addTopLevelItem(item);
+    }
+    updateStatus();
 }
 
 json ViewerBridge::viewerState() const
@@ -563,8 +718,27 @@ json ViewerBridge::viewerState() const
             });
         }
     }
+    json messageRows = json::array();
+    for (int i = 0; i < messages->topLevelItemCount(); ++i) {
+        const QTreeWidgetItem* item = messages->topLevelItem(i);
+        messageRows.push_back(
+            {{"level", item->text(0).toStdString()}, {"text", item->text(1).toStdString()}}
+        );
+    }
+    json marked = json::array();
+    for (const auto& mark : code->extraSelections()) {
+        marked.push_back(mark.cursor.blockNumber() + 1);
+    }
     const QTreeWidgetItem* selected = model->currentItem();
     return {
+        {"messages", messageRows},
+        {"code",
+         {{"title", codeTitle}, {"text", code->toPlainText().toStdString()}, {"highlighted", marked}}},
+        {"paused", Runtime::instance().isPaused()},
+        {"status",
+         {{"project", projectLabel->text().toStdString()},
+          {"document", documentLabel->text().toStdString()},
+          {"server", serverLabel->text().toStdString()}}},
         {"project", currentRoot.empty() ? json() : json(currentRoot)},
         {"activity", activityRows},
         {"changes", changeRows},

@@ -55,6 +55,14 @@ Runtime::Runtime()
     registerAddonTools(*proto, *this);
     registerDocTools(*proto, *this);
 
+    proto->setToolGate([this](const std::string&) -> std::string {
+        if (paused) {
+            return "The person watching FreeCAD has paused the agent. Wait, then retry the call; "
+                   "nothing was changed.";
+        }
+        return {};
+    });
+
     proto->setToolHooks(
         [this](const std::string& name, const nlohmann::json& args) {
             runningTool = name;
@@ -196,6 +204,16 @@ bool Runtime::guiAvailable() const
 const std::string& Runtime::currentTool() const
 {
     return runningTool;
+}
+
+void Runtime::setPaused(bool value)
+{
+    paused = value;
+}
+
+bool Runtime::isPaused() const
+{
+    return paused;
 }
 
 void Runtime::noteDialog(nlohmann::json dialog)

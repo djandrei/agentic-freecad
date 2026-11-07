@@ -60,6 +60,8 @@ void ViewerShell::apply()
     addPanel(bridge->propertiesPanel(), tr("Properties"), "Agentic_Properties", Qt::LeftDockWidgetArea);
     addPanel(bridge->activityPanel(), tr("Activity"), "Agentic_Activity", Qt::BottomDockWidgetArea);
     addPanel(bridge->changesPanel(), tr("Changes"), "Agentic_Changes", Qt::BottomDockWidgetArea);
+    addPanel(bridge->messagesPanel(), tr("Messages"), "Agentic_Messages", Qt::BottomDockWidgetArea);
+    addPanel(bridge->codePanel(), tr("Code"), "Agentic_Code", Qt::RightDockWidgetArea);
 
     const QString transport = cfg.stdio ? QStringLiteral("stdio") : QStringLiteral("http");
     // The window title belongs to the main window, which rewrites it whenever
@@ -67,6 +69,9 @@ void ViewerShell::apply()
     auto label = new QLabel(QStringLiteral("Agent mode - %1").arg(transport), mainWindow);
     label->setObjectName(QStringLiteral("Agentic_ModeLabel"));
     mainWindow->statusBar()->addPermanentWidget(label);
+    for (QWidget* widget : bridge->statusWidgets()) {
+        mainWindow->statusBar()->addPermanentWidget(widget);
+    }
 
     // Upstream modules (the Start page) act on guiInitialized, which may come
     // after this; tidy again then.

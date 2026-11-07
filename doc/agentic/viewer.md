@@ -36,6 +36,17 @@ watches the session and never drives it.
   length), the duration and whether it succeeded.
 - **Changes**: the project's change log, one row per mutation, the
   equivalent Python in the tooltip.
+- **Messages**: the console messages of the last tool call, warnings in
+  orange and errors in red.
+- **Code**: the last Python the agent ran, or the last `.py` file it
+  wrote, read-only and syntax coloured with FreeCAD's own highlighter, the
+  lines a write changed highlighted.
+
+The status bar shows the project, the active document with its objects in
+error (red) or `ok`, the server URL, and **Pause agent**: while it is down
+every tool call fails with a message telling the agent that a person
+paused it, and nothing changes. It is the only intervention a person has;
+everything else in the viewer is invisible to the agent.
 
 Activity and changes are kept per project and switch with the current
 project, the one the last tool call addressed.
