@@ -370,6 +370,16 @@ class ViewToolsTest(unittest.TestCase):
         self.assertTrue(result["path"].startswith(".agentic/captures/"))
         image = QImage(os.path.join(self.root, result["path"]))
         self.assertEqual((image.width(), image.height()), (320, 200))
+        # No navigation cube: the top-right corner, where the cube sits, is
+        # plain background (the model is fitted to the middle).
+        corner = {
+            image.pixelColor(x, y).rgb()
+            for x in range(image.width() - 90, image.width(), 3)
+            for y in range(0, 90, 3)
+        }
+        self.assertEqual(corner, {image.pixelColor(2, 2).rgb()})
+        viewer = FreeCADGui.getDocument("AgenticViewToolsTest").ActiveView.getViewer()
+        self.assertTrue(viewer.isEnabledNaviCube())  # the person's view keeps it
         self.assertDirection(result["camera"]["viewDirection"], [0, 1, 0])
         self.assertDirection(call("camera_get")["viewDirection"], reference["viewDirection"])
 

@@ -17,6 +17,8 @@ A plain `FreeCAD` launch is the classic GUI, untouched.
   document, and a capture without its own view renders from it, then puts
   back whatever a person had orbited to. A person can look around freely;
   it changes nothing the agent sees.
+- Captures leave out the navigation cube, a control for a person; the
+  view keeps it.
 
 ## Panels
 

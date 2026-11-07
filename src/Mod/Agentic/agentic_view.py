@@ -230,7 +230,15 @@ def capture(payload):
         if camera_args:
             _apply_camera(view, document, camera_args)
         Gui.updateGui()
-        view.saveImage(path, width, height, background)
+        # The navigation cube is a control for a person, not part of the model:
+        # leave it out of the picture, and give it back to the view afterwards.
+        viewer = view.getViewer()
+        cube = viewer.isEnabledNaviCube()
+        viewer.setEnabledNaviCube(False)
+        try:
+            view.saveImage(path, width, height, background)
+        finally:
+            viewer.setEnabledNaviCube(cube)
         state = _camera_state(view)
     finally:
         for item in hidden:
