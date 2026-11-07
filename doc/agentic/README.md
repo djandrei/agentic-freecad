@@ -5,6 +5,15 @@ Context Protocol (MCP) server drives FreeCAD, and a viewer window shows a
 person what the agent is doing. The design is in `DESIGN.md` at the root of
 the parent workspace; this folder documents what is built.
 
+![The agent viewer after an agent built a 15-part pillow-block shaft unit](images/viewer.png)
+
+The viewer (`FreeCAD --agent`) after an agent built a 15-part pillow-block
+shaft unit through the HTTP transport: the model tree and the properties of
+the last part it touched on the left, the 3D view in the middle, the last
+Python it ran on the right, its tool calls, change log and messages at the
+bottom, and the status bar with Pause agent, the document state, the server
+URL and the panel toggles. See `viewer.md`.
+
 ## Status: complete (server stages 0 to 9, viewer V0 to V4)
 
 Stage 9 hardened the server and checked it end to end:
