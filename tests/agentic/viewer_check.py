@@ -237,6 +237,74 @@ def stage_v3(tmp):
           "WhilePaused" not in [o["name"] for o in call("object_list")["objects"]])
 
 
+def stage_v4(tmp):
+    from PySide6.QtGui import QAction  # Qt 6 moved QAction to QtGui
+    from PySide6.QtWidgets import QToolButton, QTreeWidget, QTreeWidgetItemIterator
+
+    window = FreeCADGui.getMainWindow()
+    viewer = state()
+    names = sorted(viewer["panels"])
+    check("every panel has a toggle", names == ["Activity", "Changes", "Code", "Messages", "Model", "Properties"],
+          names)
+    check("every panel starts open", all(p["visible"] for p in viewer["panels"].values()))
+
+    toggle = window.findChild(QToolButton, "Agentic_Activity_Toggle")
+    toggle.setChecked(False)
+    settle()
+    check("a toggle closes its panel", not state()["panels"]["Activity"]["visible"])
+    call("version")
+    panel = state()["panels"]["Activity"]
+    check("a hidden panel with new content shows a dot", panel["alert"] == "new" and panel["toggle"].startswith("\u25cf"),
+          panel)
+    try:
+        call("object_get", object="NoSuchObject")
+    except RuntimeError:
+        pass
+    check("a failed call turns the dot red", state()["panels"]["Activity"]["alert"] == "error",
+          state()["panels"]["Activity"])
+    params = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Agentic/Viewer")
+    check("the layout is saved", params.GetBool("ActivityVisible", True) is False and params.GetString("State") != "")
+    toggle.setChecked(True)
+    settle()
+    panel = state()["panels"]["Activity"]
+    check("opening the panel clears the dot", panel["visible"] and panel["alert"] == "none", panel)
+    check("nothing opens by itself", not state()["panels"]["Activity"]["alert"] == "new")
+
+    window.findChild(QToolButton, "Agentic_Code_Toggle").setChecked(False)
+    settle()
+    view_only = window.findChild(QAction, "Agentic_ViewOnly")
+    view_only.setChecked(True)
+    settle()
+    viewer = state()
+    check("View only hides every panel", viewer["viewOnly"] and not any(p["visible"] for p in viewer["panels"].values()))
+    view_only.setChecked(False)
+    settle()
+    viewer = state()
+    shown = sorted(name for name, p in viewer["panels"].items() if p["visible"])
+    check("leaving View only restores the same set", shown == ["Activity", "Changes", "Messages", "Model", "Properties"],
+          shown)
+    window.findChild(QToolButton, "Agentic_Code_Toggle").setChecked(True)
+
+    agent = call("camera_set", view="isometric", fit="all")
+    tree = window.findChild(QTreeWidget, "Agentic_ModelPanel")
+    iterator = QTreeWidgetItemIterator(tree)
+    while iterator.value():
+        item = iterator.value()
+        if item.data(0, 0x0100 + 1) == "Box":
+            tree.itemDoubleClicked.emit(item, 0)
+            break
+        iterator += 1
+    settle()
+    person = call("camera_get")
+    check("a double-click fits the person's view to the object", person["inventor"] != agent["inventor"])
+    shot = call("view_capture", width=64, height=48, inline=False)
+    same = all(abs(a - b) < 1e-5 for a, b in zip(shot["camera"]["viewDirection"], agent["viewDirection"]))
+    check("captures still render from the agent's camera", same, shot["camera"]["viewDirection"])
+    check("the session's selection is left as it was", call("selection_get")["selection"] == [])
+    settle()
+    check("every panel is open again for the next run", all(p["visible"] for p in state()["panels"].values()))
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="agentic-viewer-")
     try:
@@ -244,6 +312,7 @@ def main():
         stage_v1(tmp)
         stage_v2(tmp)
         stage_v3(tmp)
+        stage_v4(tmp)
     except Exception:
         log("FAIL exception\n" + traceback.format_exc())
         failures.append("exception")

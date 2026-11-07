@@ -55,6 +55,12 @@ public:
 
     nlohmann::json viewerState() const;
 
+Q_SIGNALS:
+    /// A panel got new content; `alert` when it reports a failure (a failed
+    /// call, an error message, an object in error).
+    void contentChanged(const QString& panel, bool alert);
+
+public:
     // SessionObserver
     void currentProjectChanged(const Project* project) override;
     void fileWritten(const Project& project, const WriteResult& result) override;

@@ -17,5 +17,6 @@
 #include <QString>
 #include <QTimer>
 #include <QToolBar>
+#include <QToolButton>
 
 #include <nlohmann/json.hpp>

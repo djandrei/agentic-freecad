@@ -62,6 +62,27 @@ agent selected stays selected.
 
 `AgenticGui.viewerState()` returns every panel's content as JSON.
 
+## Panels, View only, layout
+
+Every panel is a dock in a fixed place that can be closed; the status bar
+has a toggle for each. A hidden panel that receives new content shows a dot
+on its toggle, red when the content reports a failure (a failed call, an
+error message, an object in error), until it is opened. Nothing opens by
+itself.
+
+**View only** (F11, or its status-bar button) hides every panel so the 3D
+view fills the window, and restores the same set when left.
+
+The dock layout and which panels are open persist in
+`BaseApp/Preferences/Mod/Agentic/Viewer`.
+
+## Inspection
+
+Clicking an object in the model shows its properties. Double-clicking it
+fits the person's view to the object; FreeCAD fits only to the selection,
+so the object is selected for the fit and the session's selection is put
+back in the same call. Captures keep rendering from the agent's camera.
+
 ## Checking it
 
 `tests/agentic/viewer_check.py` runs inside an agent-mode FreeCAD, drives

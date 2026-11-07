@@ -296,3 +296,21 @@ def drawing_export(payload):
             "python": f"import TechDrawGui\nTechDrawGui.exportPage{'AsPdf' if path.lower().endswith('.pdf') else 'AsSvg'}(doc.getObject({page.Name!r}), {path!r})",
         }
     )
+
+
+def inspect_fit(payload):
+    """The viewer's double-click: fit the person's view to one object.
+
+    FreeCAD fits only to the selection, so the object is selected for the fit
+    and the session's selection is put back in the same call. The agent's
+    recorded camera is left alone: captures keep rendering from it.
+    """
+    args = json.loads(payload)
+    view = _view(args["document"])
+    previous = _select_only(args["document"], [args["object"]])
+    try:
+        Gui.SendMsgToActiveView("ViewSelection")
+    finally:
+        _restore_selection(previous)
+    Gui.updateGui()
+    return json.dumps(_camera_state(view))

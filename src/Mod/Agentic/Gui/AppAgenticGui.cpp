@@ -46,7 +46,14 @@ private:
             throw Py::Exception();
         }
         Agentic::ViewerBridge* bridge = Agentic::ViewerBridge::instance();
-        return Py::String(bridge ? bridge->viewerState().dump() : std::string("null"));
+        if (!bridge) {
+            return Py::String("null");
+        }
+        nlohmann::json state = bridge->viewerState();
+        if (Agentic::ViewerShell* shell = Agentic::ViewerShell::instance()) {
+            state.update(shell->panelState());
+        }
+        return Py::String(state.dump());
     }
 
     Py::Object isCommandActive(const Py::Tuple& args)

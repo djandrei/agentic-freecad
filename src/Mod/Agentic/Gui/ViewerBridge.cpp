@@ -18,6 +18,7 @@
 #include <App/Application.h>
 #include <App/Document.h>
 #include <App/DocumentObject.h>
+#include <Base/Console.h>
 #include <Gui/Application.h>
 #include <Gui/PythonEditor.h>
 #include <Gui/ViewProviderDocumentObject.h>
@@ -86,6 +87,25 @@ ViewerBridge::ViewerBridge(QObject* parent)
         const QString object = item->data(0, Qt::UserRole + 1).toString();
         if (!object.isEmpty()) {
             showObject(item->data(0, Qt::UserRole).toString().toStdString(), object.toStdString());
+        }
+    });
+    // A double-click fits the view to the object. Only the person's view moves:
+    // captures keep rendering from the agent's camera.
+    connect(model, &QTreeWidget::itemDoubleClicked, this, [](QTreeWidgetItem* item) {
+        const QString object = item->data(0, Qt::UserRole + 1).toString();
+        if (object.isEmpty()) {
+            return;
+        }
+        try {
+            callPython(
+                "agentic_view",
+                "inspect_fit",
+                {{"document", item->data(0, Qt::UserRole).toString().toStdString()},
+                 {"object", object.toStdString()}}
+            );
+        }
+        catch (const std::exception& e) {
+            Base::Console().warning("Agentic: cannot fit the view: {}\n", e.what());
         }
     });
 
@@ -233,6 +253,7 @@ void ViewerBridge::showCode(const std::string& title, const std::string& text, i
         }
     }
     code->setExtraSelections(marks);
+    Q_EMIT contentChanged(QStringLiteral("Code"), false);
 }
 
 void ViewerBridge::fileWritten(const Project& project, const WriteResult& result)
@@ -379,6 +400,11 @@ void ViewerBridge::rebuildModel()
         model->setCurrentItem(toSelect);
         model->scrollToItem(toSelect);
     }
+    bool anyError = false;
+    for (QTreeWidgetItemIterator it(model); *it; ++it) {
+        anyError = anyError || (*it)->foreground(0).color() == QColor(Qt::red);
+    }
+    Q_EMIT contentChanged(QStringLiteral("Model"), anyError);
 }
 
 void ViewerBridge::showObject(const std::string& document, const std::string& object)
@@ -468,6 +494,7 @@ void ViewerBridge::rebuildProperties()
     }
     properties->expandAll();
     properties->resizeColumnToContents(0);
+    Q_EMIT contentChanged(QStringLiteral("Properties"), false);
 }
 
 json ViewerBridge::modelState() const
@@ -544,6 +571,7 @@ void ViewerBridge::showActivity(const ActivityRow& row)
         delete activity->takeTopLevelItem(0);
     }
     activity->scrollToItem(item);
+    Q_EMIT contentChanged(QStringLiteral("Activity"), !row.ok);
 }
 
 void ViewerBridge::showChange(const json& change)
@@ -563,6 +591,7 @@ void ViewerBridge::showChange(const json& change)
         delete changes->takeTopLevelItem(0);
     }
     changes->scrollToItem(item);
+    Q_EMIT contentChanged(QStringLiteral("Changes"), false);
 }
 
 void ViewerBridge::rebuild()
@@ -671,10 +700,12 @@ void ViewerBridge::toolCalled(const std::string& name, const json& arguments, do
 
     // The messages of this call (log lines are left to log_get).
     messages->clear();
+    bool messageError = false;
     for (const auto& entry : Runtime::instance().messages().since(callMessagesFrom)) {
         if (entry.level == "log") {
             continue;
         }
+        messageError = messageError || entry.level == "error" || entry.level == "critical";
         auto item = new QTreeWidgetItem(
             {QString::fromStdString(entry.level), QString::fromStdString(entry.text)}
         );
@@ -685,6 +716,9 @@ void ViewerBridge::toolCalled(const std::string& name, const json& arguments, do
             item->setForeground(0, QBrush(QColor(200, 120, 0)));
         }
         messages->addTopLevelItem(item);
+    }
+    if (messages->topLevelItemCount() > 0) {
+        Q_EMIT contentChanged(QStringLiteral("Messages"), messageError);
     }
     updateStatus();
 }
