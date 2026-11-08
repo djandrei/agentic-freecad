@@ -14,7 +14,9 @@ server reports the GUI layer, and checked absent when it does not
 turned off through preferences_set for the run and restored afterwards.
 """
 
+import json
 import os
+import pathlib
 import sys
 import tempfile
 import traceback
@@ -129,8 +131,8 @@ def run_groups(fc, root, gui):
         handle.writestr("Demo-main/README.md", "# Demo\n")
     registry = os.path.join(root, "..", "registry.json")
     with open(registry, "w") as handle:
-        handle.write('{"Demo": [{"repository": "https://example.invalid/d", "zip_url": "file://'
-                     + os.path.realpath(archive) + '"}]}')
+        zip_url = pathlib.Path(os.path.realpath(archive)).as_uri()
+        json.dump({"Demo": [{"repository": "https://example.invalid/d", "zip_url": zip_url}]}, handle)
     fc.call("addon_registry_add", location=os.path.realpath(registry))
     check("the catalog lists the addon", [a["id"] for a in fc.call("addon_catalog")["addons"]] == ["Demo"])
     check("an addon installs", fc.call("addon_install", id="Demo")["method"] == "zip")

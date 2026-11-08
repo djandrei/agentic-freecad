@@ -3,6 +3,7 @@
 
 import json
 import os
+import pathlib
 import tempfile
 import unittest
 
@@ -762,7 +763,7 @@ def make_addon_registry(folder):
                     {
                         "repository": "https://example.invalid/demo",
                         "git_ref": "main",
-                        "zip_url": "file://" + good,
+                        "zip_url": pathlib.Path(good).as_uri(),
                         "freecad_min": "0.21.0",
                     }
                 ],
@@ -770,13 +771,13 @@ def make_addon_registry(folder):
                     {
                         "repository": "https://example.invalid/evil",
                         "git_ref": "main",
-                        "zip_url": "file://" + evil,
+                        "zip_url": pathlib.Path(evil).as_uri(),
                     }
                 ],
                 "Future": [
                     {
                         "repository": "https://example.invalid/f",
-                        "zip_url": "file://" + good,
+                        "zip_url": pathlib.Path(good).as_uri(),
                         "freecad_min": "99.0.0",
                     }
                 ],
