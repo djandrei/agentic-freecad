@@ -28,6 +28,12 @@ public:
     SessionManager(ObserverList& observers, MessageLog& messages, Runtime& runtime);
     ~SessionManager();
 
+    // Owns the sessions. Deleted explicitly, not left implicit: MSVC
+    // instantiates every special member of an exported class, and the
+    // implicit copy of the vector of unique_ptr does not compile.
+    SessionManager(const SessionManager&) = delete;
+    SessionManager& operator=(const SessionManager&) = delete;
+
     /// Opens the project in the folder (creating the settings file when
     /// missing, or the folder itself when create is set) and makes it current.
     EngineSession& open(const std::filesystem::path& root, bool create);
