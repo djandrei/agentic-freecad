@@ -32,6 +32,7 @@ Every hook is wrapped in `if(BUILD_AGENTIC)` or `#ifdef BUILD_AGENTIC`.
 | `src/App/Application.cpp` | the `--agent`, `--agent-stdio`, `--agent-port`, `--agent-headless` and `--project` options, stored as the `AgentMode`, `AgentStdio`, `AgentHeadless`, `AgentPort` and `AgentProject` configuration keys; stdio mode also silences `LoggingConsole` because stdout is the transport; when the run mode is not `Gui` (FreeCADCmd, `-c`) the run mode becomes `Internal` with an `AgenticServe` script that calls `Agentic.serve()` |
 | `.pre-commit-config.yaml` | `src/Mod/Agentic` added to the formatting allowlist |
 | `.gitignore` | `/doc/` narrowed to `/doc/*` with `!/doc/agentic/`, so this documentation is tracked while the Doxygen output folder stays ignored |
+| `.github/workflows/sub_buildPixi.yml` | the problem-matcher paths use `github.workspace` instead of `runner.workspace` plus `/FreeCAD`, which only exists when the repository is named FreeCAD; a general fix that can be offered upstream as is |
 
 No hook is needed in `src/Main/MainGui.cpp` or `src/Gui/Application.cpp`:
 the module's `Init.py` runs inside `App::Application::init()`, early enough
